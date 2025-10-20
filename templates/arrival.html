@@ -1,0 +1,349 @@
+{% extends 'base.html' %}
+
+{% block title %}到站信息{% endblock %}
+
+{% block page_title %}
+    <div class="arrival-title">
+        <span class="arrival-label">到达站</span>
+        <span class="arrival-station-name">{% if next_station_info %}{{ next_station_info.station_name }}{% else %}{{ next_station }}{% endif %}</span>
+        <span class="arrival-station-name-en">{% if next_station_info %}{{ next_station_info.station_name_en }}{% else %}{{ next_station }}{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block head %}
+<style>
+    :root { --theme-color: #9b5de5; }
+    .arrival-title {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .arrival-label {
+        font-size: 18px;
+        color: #fff;
+        opacity: 0.9;
+    }
+    
+    .arrival-station-name {
+        font-size: 32px;
+        font-weight: bold;
+        color: #fff;
+    }
+    
+    .arrival-station-name-en {
+        font-size: 16px;
+        color: #fff;
+        opacity: 0.8;
+    }
+    
+    .station-layout-container {
+        background-color: #fff;
+        border-radius: 10px;
+        padding: 30px;
+        margin: 20px 0;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .station-layout {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        position: relative;
+        min-height: 300px;
+    }
+    
+    .platform {
+        width: 100%;
+        height: 100px;
+        background-color: #f0f0f0;
+        border: 2px solid #999;
+        border-radius: 5px;
+        position: relative;
+        margin-bottom: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .platform::before {
+        content: '站台平台';
+        position: absolute;
+        top: -25px;
+        font-size: 16px;
+        font-weight: bold;
+        color: #666;
+    }
+    
+    .train {
+        width: 90%;
+        height: 150px;
+        background-color: #e0e0e0;
+        border: 3px solid #333;
+        border-radius: 8px;
+        position: relative;
+        display: flex;
+        flex-direction: column;
+    }
+    
+    .train-roof {
+        width: 100%;
+        height: 20px;
+        background-color: var(--theme-color);
+        border-top-left-radius: 5px;
+        border-top-right-radius: 5px;
+    }
+    
+    .train-body {
+        flex: 1;
+        display: flex;
+        position: relative;
+    }
+    
+    .carriage {
+        flex: 1;
+        border-right: 1px dashed #999;
+        position: relative;
+    }
+    
+    .carriage:last-child {
+        border-right: none;
+    }
+    
+    .carriage-number {
+        position: absolute;
+        top: 5px;
+        left: 5px;
+        font-size: 14px;
+        font-weight: bold;
+        color: #666;
+    }
+    
+    .door {
+        position: absolute;
+        width: 60px;
+        height: 80%;
+        top: 10%;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #ff4757;
+        border: 2px solid #d63031;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 18px;
+        animation: pulse 1.5s infinite;
+    }
+    
+    @keyframes pulse {
+        0% { opacity: 1; }
+        50% { opacity: 0.7; }
+        100% { opacity: 1; }
+    }
+    
+    .current-carriage {
+        background-color: #ffd700;
+    }
+    
+    .current-carriage-indicator {
+        position: absolute;
+        bottom: -30px;
+        left: 50%;
+        transform: translateX(-50%);
+        background-color: #ff4757;
+        color: white;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: bold;
+    }
+    
+    .exit-signs {
+        position: absolute;
+        top: -20px;
+        display: flex;
+        gap: 10px;
+    }
+    
+    .exit-sign {
+        background-color: #2d3436;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: bold;
+    }
+    
+    .exit-sign.A {
+        background-color: #00b894;
+    }
+    
+    .exit-sign.B {
+        background-color: #0984e3;
+    }
+    
+    .exit-sign.C {
+        background-color: #fdcb6e;
+        color: #2d3436;
+    }
+    
+    .exit-sign.D {
+        background-color: #d63031;
+    }
+    
+    .direction-arrows {
+        position: absolute;
+        bottom: -40px;
+        right: 20px;
+        font-size: 24px;
+        color: var(--theme-color);
+    }
+    
+    .announcement {
+        background-color: #f8f9fa;
+        border-left: 4px solid var(--theme-color);
+        padding: 15px;
+        margin: 20px 0;
+        font-size: 16px;
+        color: #666;
+        border-radius: 0 5px 5px 0;
+    }
+    
+    .announcement strong {
+        color: var(--theme-color);
+    }
+    
+    .next-station-info {
+        background-color: var(--theme-color);
+        color: white;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 20px;
+        font-size: 16px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <div class="station-layout-container" style="--theme-color: {{ line_color or '#9b5de5' }};">
+        <div class="station-layout">
+            <!-- 站台平台 -->
+            <div class="platform">
+                <div class="exit-signs">
+                    <div class="exit-sign A">A出口</div>
+                    <div class="exit-sign B">B出口</div>
+                    <div class="exit-sign C">C出口</div>
+                    <div class="exit-sign D">D出口</div>
+                </div>
+            </div>
+            
+            <!-- 列车 -->
+            <div class="train">
+                <div class="train-roof"></div>
+                <div class="train-body">
+                    <!-- 车厢1 -->
+                    <div class="carriage">
+                        <div class="carriage-number">8</div>
+                    </div>
+                    
+                    <!-- 车厢2 -->
+                    <div class="carriage">
+                        <div class="carriage-number">7</div>
+                    </div>
+                    
+                    <!-- 车厢3 -->
+                    <div class="carriage">
+                        <div class="carriage-number">6</div>
+                    </div>
+                    
+                    <!-- 车厢4 -->
+                    <div class="carriage">
+                        <div class="carriage-number">5</div>
+                    </div>
+                    
+                    <!-- 车厢5 -->
+                    <div class="carriage">
+                        <div class="carriage-number">4</div>
+                    </div>
+                    
+                    <!-- 车厢6（当前车厢） -->
+                    <div class="carriage current-carriage">
+                        <div class="carriage-number">3</div>
+                        <div class="door">
+                            开门
+                        </div>
+                        <div class="current-carriage-indicator">当前车厢</div>
+                    </div>
+                    
+                    <!-- 车厢7 -->
+                    <div class="carriage">
+                        <div class="carriage-number">2</div>
+                    </div>
+                    
+                    <!-- 车厢8 -->
+                    <div class="carriage">
+                        <div class="carriage-number">1</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="direction-arrows">→→→</div>
+        </div>
+        
+        <!-- 到站提示 -->
+        <div class="announcement">
+            <strong>{% if next_station_info %}{{ next_station_info.station_name }}{% else %}{{ next_station }}{% endif %}站</strong>到了，请从列车前进方向右侧车门下车，注意列车与站台之间的空隙。
+        </div>
+        
+        <!-- 下一站信息 -->
+        <div class="next-station-info">
+            <strong>下一站：</strong>{% if next_station %}{{ next_station }}{% endif %}，
+            {% if transfer_badges and transfer_badges|length > 0 %}
+                本站可换乘：
+                <span class="transfer-badges" style="display:inline-flex; gap:8px; vertical-align:middle;">
+                    {% for b in transfer_badges %}
+                    <span class="transfer-badge" style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; font-weight:bold; color:#fff;" data-color="{{ b.color }}">{{ b.code }}</span>
+                    {% endfor %}
+                </span>
+            {% else %}
+                本站无换乘线路。
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="navigation-buttons" style="margin-top: 30px; display: flex; justify-content: center; gap: 20px;">
+        <button class="btn" onclick="navigateTo('/')">返回首页</button>
+        <button class="btn" onclick="navigateTo('/next_station')">下一站信息</button>
+        <button class="btn" onclick="navigateTo('/line_map')">查看线路图</button>
+        <button class="btn" onclick="navigateTo('/station_detail')">站点详情</button>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 到站信息页面加载完成
+        console.log('到站信息页面加载完成');
+        
+        // 添加开门动画效果
+        const door = document.querySelector('.door');
+        if (door) {
+            setInterval(() => {
+                door.style.opacity = door.style.opacity === '0.6' ? '1' : '0.6';
+            }, 500);
+        }
+
+        // 通过 data-color 设置换乘徽章背景色，避免CSS模板表达式
+        document.querySelectorAll('.transfer-badge[data-color]').forEach(el => {
+            const color = el.getAttribute('data-color');
+            if (color) {
+                el.style.backgroundColor = color;
+            }
+        });
+    });
+</script>
+{% endblock %}

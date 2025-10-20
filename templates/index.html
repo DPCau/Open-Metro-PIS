@@ -1,0 +1,238 @@
+{% extends 'base.html' %}
+
+{% block title %}成都地铁PIS车内导视系统{% endblock %}
+
+{% block page_title %}
+    <div class="index-title">
+        <h1>成都地铁PIS车内导视系统</h1>
+        <p>Passenger Information System</p>
+    </div>
+{% endblock %}
+
+{% block head %}
+<style>
+    .index-title {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+    
+    .index-title h1 {
+        font-size: 32px;
+        color: #fff;
+        margin: 0 0 10px 0;
+        font-weight: bold;
+    }
+    
+    .index-title p {
+        font-size: 18px;
+        color: #fff;
+        opacity: 0.8;
+        margin: 0;
+    }
+    
+    .current-info {
+        background-color: #fff;
+        border-radius: 10px;
+        padding: 30px;
+        margin-bottom: 40px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        text-align: center;
+    }
+    
+    .current-info h2 {
+        font-size: 24px;
+        color: #9b5de5;
+        margin: 0 0 20px 0;
+    }
+    
+    .info-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-top: 20px;
+    }
+    
+    .info-card {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        text-align: center;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .info-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    .info-label {
+        font-size: 16px;
+        color: #666;
+        margin-bottom: 10px;
+    }
+    
+    .info-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #9b5de5;
+    }
+    
+    .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 25px;
+    }
+    
+    .feature-card {
+        background-color: #fff;
+        border-radius: 10px;
+        padding: 25px;
+        text-align: center;
+        transition: transform 0.3s, box-shadow 0.3s;
+        cursor: pointer;
+        position: relative;
+        overflow: hidden;
+    }
+    
+    .feature-card:hover {
+        transform: translateY(-10px);
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.15);
+    }
+    
+    .feature-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 5px;
+        background: linear-gradient(90deg, #9b5de5, #f15bb5);
+    }
+    
+    .feature-icon {
+        font-size: 48px;
+        color: #9b5de5;
+        margin-bottom: 20px;
+    }
+    
+    .feature-title {
+        font-size: 20px;
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 10px;
+    }
+    
+    .feature-description {
+        font-size: 14px;
+        color: #666;
+        line-height: 1.5;
+    }
+    
+    .system-status {
+        background-color: #fff;
+        border-radius: 10px;
+        padding: 20px;
+        margin-top: 40px;
+        text-align: center;
+        font-size: 14px;
+        color: #666;
+    }
+    
+    .system-status .status-item {
+        margin: 5px 0;
+    }
+    
+    .status-item .label {
+        font-weight: bold;
+        margin-right: 10px;
+    }
+    
+    .status-item .value {
+        color: #9b5de5;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <!-- 当前信息展示 -->
+    <div class="current-info">
+        <h2>当前运行信息</h2>
+        <div class="info-grid">
+            <div class="info-card">
+                <div class="info-label">运营线路</div>
+                <div class="info-value">{{ line|line_display }}</div>
+            </div>
+            <div class="info-card">
+                <div class="info-label">当前站点</div>
+                <div class="info-value">{{ current_station }}</div>
+            </div>
+            <div class="info-card">
+                <div class="info-label">下一站</div>
+                <div class="info-value">{{ next_station }}</div>
+            </div>
+            <div class="info-card">
+                <div class="info-label">终点站</div>
+                <div class="info-value">{{ terminal_station }}</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 功能模块入口 -->
+    <div class="feature-grid">
+        <div class="feature-card" onclick="navigateTo('/next_station')">
+            <div class="feature-icon">→</div>
+            <div class="feature-title">下一站信息</div>
+            <div class="feature-description">查看下一站详细信息和列车运行路线</div>
+        </div>
+        
+        <div class="feature-card" onclick="navigateTo('/line_map')">
+            <div class="feature-icon">🗺️</div>
+            <div class="feature-title">线路图</div>
+            <div class="feature-description">查看完整地铁线路图和站点分布</div>
+        </div>
+        
+        <div class="feature-card" onclick="navigateTo('/station_detail')">
+            <div class="feature-icon">📍</div>
+            <div class="feature-title">站点详情</div>
+            <div class="feature-description">查看当前站点的出口、换乘等详细信息</div>
+        </div>
+        
+        <div class="feature-card" onclick="navigateTo('/arrival')">
+            <div class="feature-icon">🚪</div>
+            <div class="feature-title">到站信息</div>
+            <div class="feature-description">查看到站开门方向和站台布局</div>
+        </div>
+    </div>
+    
+    <!-- 系统状态 -->
+    <div class="system-status">
+        <div class="status-item">
+            <span class="label">系统状态:</span>
+            <span class="value">正常运行</span>
+        </div>
+        <div class="status-item">
+            <span class="label">数据更新时间:</span>
+            <span class="value time"></span>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('PIS车内导视系统首页加载完成');
+        
+        // 为功能卡片添加点击动画
+        const featureCards = document.querySelectorAll('.feature-card');
+        featureCards.forEach(card => {
+            card.addEventListener('click', function() {
+                this.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    const href = this.getAttribute('onclick').match(/navigateTo\('([^']+)'\)/)[1];
+                    window.location.href = href;
+                }, 200);
+            });
+        });
+    });
+</script>
+{% endblock %}

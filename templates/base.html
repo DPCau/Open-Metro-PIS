@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>成都地铁PIS系统 - {% block title %}{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <img src="{{ url_for('static', filename='images/logo.png') }}" alt="成都地铁" class="logo">
+            <span class="line-info">{% if line_name %}{% if line_name == 'line_5' %}5号线{% elif line_name == 'line_1' %}1号线{% elif line_name == 'line_2' %}2号线{% elif line_name == 'line_3' %}3号线{% elif line_name == 'line_4' %}4号线{% elif line_name == 'line_6' %}6号线{% elif line_name == 'line_7' %}7号线{% elif line_name == 'line_8' %}8号线{% elif line_name == 'line_9' %}9号线{% else %}{{ line_name }}{% endif %}{% endif %}</span>
+        </div>
+        <div class="header-center">
+            <h1 class="title">{% block page_title %}{% endblock %}</h1>
+        </div>
+        <div class="header-right">
+            <span class="time">{% if current_time %}{{ current_time }}{% else %}{{ "22:19" }}{% endif %}</span>
+            {% if door_side %}<span class="door-info">{% if door_side == '本侧' %}本侧开门{% else %}对侧开门{% endif %}</span>{% endif %}
+        </div>
+    </header>
+
+    <main class="content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="footer-info">
+            <p>成都地铁PIS系统 &copy; 2024</p>
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

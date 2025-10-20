@@ -1,0 +1,849 @@
+{% extends 'base.html' %}
+
+{% block title %}线路图{% endblock %}
+
+{% block head %}
+<style>
+    .line-map-container {
+        width: 100%;
+        padding: 20px 0;
+        overflow: visible;
+    }
+    
+    .line-map {
+        position: relative;
+        width: 100%;
+    }
+    
+    .metro-line {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 60px;
+        margin-bottom: 40px;
+        position: relative;
+        width: 100%;
+    }
+    
+    .line-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 60px;
+        position: relative;
+        width: 100%;
+        margin-bottom: 40px;
+    }
+    
+    .line-row:last-child {
+        margin-bottom: 0;
+    }
+    
+    /* 反向行（偶数行） */
+    .line-row.reverse {
+        flex-direction: row-reverse;
+        justify-content: space-between;
+    }
+    
+    :root {
+        --theme-color: #9b5de5;
+        /* 箭头配置 */
+        --arrow-size: 25px;
+        --arrow-weight: 900;
+        --arrow-color-black: #000;
+        --arrow-color-gray: #555;
+        --arrow-color-red: #ff3b30;
+        --arrow-blink-duration: 1s;
+    }
+    /* 基础灰色轨道（已走过段） */
+    .line-row::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: var(--rail-left, 0);
+        width: var(--rail-width, 100%);
+        height: 15px;
+        background-color: #ddd;
+        transform: translateY(-50%);
+        border-radius: 8px;
+        z-index: 0;
+    }
+    /* 彩色未走过轨道段（从下一站开始） */
+    .line-row::before {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: var(--rail-colored-left, var(--rail-left, 0));
+        width: var(--rail-colored-width, 0);
+        height: 15px;
+        background-color: var(--theme-color);
+        transform: translateY(-50%);
+        border-radius: 8px;
+        z-index: 1;
+    }
+    
+    /* 连接线 - 行间连接 */
+    .connector {
+        position: absolute;
+        background-color: #ddd;
+        z-index: 0;
+    }
+    
+    /* 垂直连接线 */
+    .connector.vertical {
+        width: 15px;
+        height: var(--connector-height, 80px);
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        border-radius: 8px;
+    }
+    
+    /* 水平连接线（用于反向行） */
+    .connector.horizontal {
+        width: var(--connector-width, 60px);
+        height: 15px;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        border-radius: 8px;
+    }
+    
+    /* 方向箭头样式 */
+    .direction-arrow {
+        position: absolute;
+        font-weight: var(--arrow-weight, 900);
+        font-size: var(--arrow-size, 18px);
+        line-height: 1;
+        z-index: 1;
+        pointer-events: none;
+    }
+    .direction-arrow.black { color: var(--arrow-color-black, #000); }
+    .direction-arrow.gray { color: var(--arrow-color-gray, #555); }
+    .direction-arrow.red { color: var(--arrow-color-red, #ff3b30); animation: blink var(--arrow-blink-duration, 1s) infinite alternate; }
+    
+    /* 圆弧帽（连接水平与垂直） */
+    .connector.cap {
+        width: 15px;
+        height: 15px;
+        position: absolute;
+        background-color: #ddd;
+        border-radius: 50%;
+        z-index: 0;
+    }
+    
+    .station-node {
+        position: relative;
+        z-index: 2;
+        min-width: 80px;
+        width: 80px;
+        height: 10px;
+    }
+    
+    .station-circle {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 14px;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: #fff;
+        border: 3px solid var(--theme-color);
+        color: #fff;
+        box-shadow: 0 0 0 3px #fff inset;
+    }
+    
+    /* 仅下一站显示红点动画 */
+    .station-circle.next::before {
+        content: '';
+        width: 10px;
+        height: 10px;
+        background: #ff3b30;
+        border-radius: 50%;
+        animation: blink 1s infinite alternate;
+    }
+
+    /* 下一站英文名加粗且红色 */
+    .station-circle.next ~ .station-labels .station-name.en {
+        color: #ff4757;
+        font-weight: bold;
+    }
+    
+    /* 已走过站点：灰色且无动态 */
+    .station-circle.passed {
+        background-color: #cfcfcf;
+        border-color: #cfcfcf;
+        box-shadow: 0 0 0 3px #cfcfcf inset;
+    }
+
+    /* 非当前子路线站点：灰色静止（不显示动画与彩环） */
+    .station-circle.inactive {
+        background-color: #eeeeee;
+        border-color: #dddddd;
+        box-shadow: 0 0 0 3px #eeeeee inset;
+    }
+    .station-name.inactive {
+        color: #999999;
+    }
+    
+    /* 换乘站：空心圆环，旋转彩环仅未走过时启用 */
+    .station-circle.transfer {
+        background-color: transparent;
+        color: var(--theme-color);
+        box-shadow: none;
+        border: 3px solid var(--theme-color);
+    }
+    /* 非当前子路线的换乘站：环不旋转，边框改为中性灰，保持空心圆展示等分环 */
+    .station-circle.transfer.inactive {
+        background-color: transparent;
+        border-color: #cccccc;
+        box-shadow: none;
+    }
+    .station-circle.transfer::before {
+        content: '';
+        position: absolute;
+        inset: 6px;
+        border-radius: 50%;
+        background: #fff;
+        z-index: 1;
+    }
+    
+    .station-labels {
+        position: absolute;
+        top: calc(50% + 28px);
+        left: 50%;
+        transform: translateX(-50%);
+        text-align: center;
+        width: 140px;
+    }
+    .station-name {
+        font-size: 14px;
+        color: #333;
+        text-align: center;
+        line-height: 1.2;
+    }
+    .station-name.current {
+        color: #ff4757;
+        font-weight: bold;
+    }
+    .station-name.en {
+        font-size: 12px;
+        color: #666;
+        margin-top: 2px;
+    }
+    
+
+    
+    .transfer-badges {
+        position: absolute;
+        top: calc(50% - 37px);
+        left: 50%;
+        transform: translateX(-50%);
+        display: inline-flex;
+        gap: 6px;
+        z-index: 3;
+    }
+    .transfer-badge {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        color: white;
+        font-weight: bold;
+    }
+    
+    
+    /* 滚动条样式 */
+    .line-map-container::-webkit-scrollbar { height: 8px; }
+    .line-map-container::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+    .line-map-container::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+    .line-map-container::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+    
+    @keyframes blink { from { opacity: 0.2; } to { opacity: 1; } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="line-map-container">
+    <div class="line-map" style="--theme-color: {{ line_color or '#9b5de5' }};">
+        
+        <div class="metro-line" id="metro-line">
+            <!-- 线路行将通过JavaScript动态生成 -->
+        </div>
+        <!-- 将数据以JSON脚本标签形式注入，避免内联JS语法冲突 -->
+        <script id="line-info-data" type="application/json">{{ line_info | tojson }}</script>
+    <script id="current-route-stations-data" type="application/json">{{ current_route_stations | tojson }}</script>
+    <script id="full-route-mode-data" type="application/json">{{ full_route_mode | tojson }}</script>
+        <script id="next-station-data" type="application/json">{{ next_station | tojson }}</script>
+        <script id="is-reversed-data" type="application/json">{{ is_reversed | tojson }}</script>
+    </div>
+</div>
+
+<div class="navigation-buttons" style="margin-top: 30px; display: flex; justify-content: center; gap: 20px;">
+    <button class="btn" onclick="navigateTo('/')">返回首页</button>
+    <button class="btn" onclick="navigateTo('/next_station')">下一站信息</button>
+    <button class="btn" onclick="navigateTo('/station_detail')">站点详情</button>
+    <button class="btn" onclick="navigateTo('/arrival')">到站信息</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// 线路数据（从JSON脚本标签解析，避免模板语法影响JS解析）
+const lineInfo = JSON.parse(document.getElementById('line-info-data')?.textContent || '[]');
+const currentRouteStations = JSON.parse(document.getElementById('current-route-stations-data')?.textContent || '[]');
+const fullRouteMode = JSON.parse(document.getElementById('full-route-mode-data')?.textContent || 'false');
+const currentRouteSet = new Set(currentRouteStations);
+const nextStationName = JSON.parse(document.getElementById('next-station-data')?.textContent || 'null');
+const isReversed = JSON.parse(document.getElementById('is-reversed-data')?.textContent || 'false');
+
+// 创建站点节点HTML
+function createStationNode(station) {
+    const isNext = station.station_name === nextStationName;
+    const isTransfer = station.is_transfer;
+    const isInactive = fullRouteMode && !currentRouteSet.has(station.station_name);
+    
+    return `
+        <div class="station-node">
+            <div class="station-circle ${isNext ? 'next' : ''} ${isTransfer ? 'transfer' : ''} ${isInactive ? 'inactive' : ''}"></div>
+            ${station.transfer_badges && station.transfer_badges.length > 0 ? `
+                <div class="transfer-badges">
+                    ${station.transfer_badges.map(b => `
+                        <div class="transfer-badge" data-color="${b.color}">${b.code}</div>
+                    `).join('')}
+                </div>
+            ` : ''}
+            <div class="station-labels">
+                <div class="station-name ${isNext ? 'current' : ''} ${isInactive ? 'inactive' : ''}">${station.station_name}</div>
+                <div class="station-name en ${isInactive ? 'inactive' : ''}">${station.station_en_name || station.station_name_en || ''}</div>
+            </div>
+            ${isNext ? `
+                
+            ` : ''}
+        </div>
+    `;
+}
+
+// 计算每行能容纳的站点数量
+function calculateStationsPerRow() {
+    const containerWidth = document.querySelector('.line-map-container').offsetWidth;
+    const stationWidth = 80; // 站点节点宽度
+    const gap = 60; // 站点间距
+    const margin = 40; // 边距
+    
+    const availableWidth = containerWidth - margin * 2;
+    const stationsPerRow = Math.floor(availableWidth / (stationWidth + gap));
+    
+    return Math.max(1, stationsPerRow);
+}
+
+// 创建Z字形布局
+function createZigzagLayout() {
+    const metroLine = document.getElementById('metro-line');
+    const stationsPerRow = calculateStationsPerRow();
+
+    // 计算全局“下一站”索引并存入容器数据属性
+    const globalNextIndex = lineInfo.findIndex(s => s.station_name === nextStationName);
+    metroLine.dataset.nextIndex = String(globalNextIndex);
+    
+    // 清空现有内容
+    metroLine.innerHTML = '';
+    
+    // 如果站点数量少于每行容量，直接显示一行
+    if (lineInfo.length <= stationsPerRow) {
+        const row = document.createElement('div');
+        row.className = 'line-row';
+        // 记录单行范围
+        row.dataset.startIndex = '0';
+        row.dataset.endIndex = String(lineInfo.length - 1);
+        row.innerHTML = lineInfo.map(createStationNode).join('');
+        metroLine.appendChild(row);
+        return;
+    }
+    
+    // 创建多行Z字形布局
+    let currentIndex = 0;
+    let rowIndex = 0;
+    
+    console.log(`总站点数: ${lineInfo.length}, 每行站点数: ${stationsPerRow}`);
+    
+    while (currentIndex < lineInfo.length) {
+        const row = document.createElement('div');
+        // 修正：行索引为奇数的行翻转（第2、4、6...行）
+        const isReverse = rowIndex % 2 === 1; // 行索引从0开始，奇数索引对应偶数行
+        row.className = `line-row ${isReverse ? 'reverse' : ''}`;
+        
+        // 计算当前行的站点范围
+        const startIndex = currentIndex;
+        const endIndex = Math.min(currentIndex + stationsPerRow, lineInfo.length);
+        const rowStations = lineInfo.slice(startIndex, endIndex);
+        
+        // 记录该行的索引范围（闭区间）
+        row.dataset.startIndex = String(startIndex);
+        row.dataset.endIndex = String(endIndex - 1);
+        
+        console.log(`第${rowIndex + 1}行 (索引${rowIndex}): ${isReverse ? '反向' : '正向'}, 站点: ${startIndex + 1}-${endIndex}`);
+        if (isReverse) {
+            console.log(`  反向行（CSS反排）: ${rowStations.map(s => s.station_name).join(' → ')}`);
+        }
+        
+        row.innerHTML = rowStations.map(createStationNode).join('');
+        metroLine.appendChild(row);
+        
+        // 连接线改由计算阶段基于实际位置添加，这里不再创建
+        
+        currentIndex = endIndex;
+        rowIndex++;
+    }
+}
+
+// 计算轨道和连接线
+function computeRailAndConnectors() {
+    const metroLine = document.getElementById('metro-line');
+    const metroRect = metroLine.getBoundingClientRect();
+    const thickness = 15; // 轨道厚度，与CSS保持一致
+
+    const rows = Array.from(document.querySelectorAll('.line-row'));
+
+    // 清理旧连接线和旧箭头
+    metroLine.querySelectorAll('.connector').forEach(el => el.remove());
+    metroLine.querySelectorAll('.direction-arrow').forEach(el => el.remove());
+    
+    // 先计算每行的轨道（灰色与彩色段）
+    rows.forEach((row, rowIndex) => {
+        const stations = Array.from(row.querySelectorAll('.station-node'));
+        
+        const rowLeft = row.getBoundingClientRect().left;
+        
+        if (stations.length < 2) {
+            // 单站点行：不显示轨道
+            row.style.setProperty('--rail-left', '0px');
+            row.style.setProperty('--rail-width', '0px');
+            row.style.setProperty('--rail-colored-left', '0px');
+            row.style.setProperty('--rail-colored-width', '0px');
+            return;
+        }
+        
+        const firstRect = stations[0].getBoundingClientRect();
+        const lastRect = stations[stations.length - 1].getBoundingClientRect();
+        
+        const firstCenterX = firstRect.left + firstRect.width / 2;
+        const lastCenterX = lastRect.left + lastRect.width / 2;
+        
+        // 轨道起止点对齐站点圆心，避免在端侧突出
+        const railLeft = Math.min(firstCenterX, lastCenterX) - rowLeft;
+        const railWidth = Math.abs(lastCenterX - firstCenterX);
+        
+        row.style.setProperty('--rail-left', railLeft + 'px');
+        row.style.setProperty('--rail-width', railWidth + 'px');
+
+        // 根据全局“下一站”索引判断整行着色逻辑
+        const globalNextIndex = parseInt(document.getElementById('metro-line').dataset.nextIndex || '-1');
+        const rowStart = parseInt(row.dataset.startIndex || '-1');
+        const rowEnd = parseInt(row.dataset.endIndex || '-1');
+
+        let coloredLeft = railLeft;
+        let coloredWidth = 0;
+
+        // 计算当前子路线的全局活动区间（activeStart..activeEnd）
+        const activeIndices = currentRouteStations.length ? lineInfo.map((s, i) => currentRouteSet.has(s.station_name) ? i : -1).filter(i => i >= 0) : [];
+        const activeStart = activeIndices.length ? Math.min(...activeIndices) : -1;
+        const activeEnd = activeIndices.length ? Math.max(...activeIndices) : -1;
+        const hasActiveRange = fullRouteMode && activeStart >= 0 && activeEnd >= 0;
+        
+        if (!isNaN(globalNextIndex) && !isNaN(rowStart) && !isNaN(rowEnd)) {
+            if (globalNextIndex >= rowStart && globalNextIndex <= rowEnd) {
+                // 下一站在本行：从下一站到活动区间端点（或行端）着色
+                const localNextIndex = stations.findIndex(station => 
+                    station.querySelector('.station-circle').classList.contains('next')
+                );
+                // 已走过标记：方向敏感，正向标记下一站之前，反向标记下一站之后
+                const isReverseRow = row.classList.contains('reverse');
+                stations.forEach((station, idx) => {
+                    const globalIdx = rowStart + idx;
+                    const circle = station.querySelector('.station-circle');
+                    const isActive = !hasActiveRange ? true : (globalIdx >= activeStart && globalIdx <= activeEnd);
+                    if (isActive && localNextIndex >= 0) {
+                        const isPassed = isReverseRow ? (idx > localNextIndex) : (idx < localNextIndex);
+                        if (isPassed) {
+                            circle.classList.add('passed');
+                        }
+                    }
+                });
+                if (localNextIndex >= 0) {
+                    const nextRect = stations[localNextIndex].getBoundingClientRect();
+                    const nextCenterX = nextRect.left + nextRect.width / 2;
+                    let endIndexForColor;
+                    if (hasActiveRange) {
+                        const rowActiveStart = Math.max(rowStart, activeStart);
+                        const rowActiveEnd = Math.min(rowEnd, activeEnd);
+                        if (rowActiveStart <= rowActiveEnd) {
+                            endIndexForColor = row.classList.contains('reverse') ? (rowActiveStart - rowStart) : (rowActiveEnd - rowStart);
+                        }
+                    }
+                    if (endIndexForColor === undefined) {
+                        // 反向行应向视觉左端着色，使用最后一个站点作为端点
+                        endIndexForColor = stations.length - 1;
+                    }
+                    const endRect = stations[endIndexForColor].getBoundingClientRect();
+                    const endCenterX = endRect.left + endRect.width / 2;
+                    coloredLeft = Math.min(nextCenterX, endCenterX) - rowLeft;
+                    coloredWidth = Math.abs(endCenterX - nextCenterX);
+                }
+            } else if (globalNextIndex < rowStart) {
+                // 下一站在本行之前：本行尚未到达，若存在活动区间，仅着色活动区间部分
+                if (hasActiveRange) {
+                    const rowActiveStart = Math.max(rowStart, activeStart);
+                    const rowActiveEnd = Math.min(rowEnd, activeEnd);
+                    if (rowActiveStart <= rowActiveEnd) {
+                        const startRect = stations[rowActiveStart - rowStart].getBoundingClientRect();
+                        const endRect = stations[rowActiveEnd - rowStart].getBoundingClientRect();
+                        const startX = startRect.left + startRect.width / 2;
+                        const endX = endRect.left + endRect.width / 2;
+                        coloredLeft = Math.min(startX, endX) - rowLeft;
+                        coloredWidth = Math.abs(endX - startX);
+                    } else {
+                        coloredLeft = railLeft;
+                        coloredWidth = 0;
+                    }
+                } else {
+                    coloredLeft = railLeft;
+                    coloredWidth = railWidth;
+                }
+            } else {
+                // 下一站在本行之后：本行已全部经过，仅将活动区间站标记为已过
+                coloredLeft = railLeft;
+                coloredWidth = 0;
+                stations.forEach((station, idx) => {
+                    const globalIdx = rowStart + idx;
+                    const circle = station.querySelector('.station-circle');
+                    const isActive = !hasActiveRange ? true : (globalIdx >= activeStart && globalIdx <= activeEnd);
+                    if (isActive) circle.classList.add('passed');
+                });
+            }
+        }
+        
+        row.style.setProperty('--rail-colored-left', coloredLeft + 'px');
+        row.style.setProperty('--rail-colored-width', coloredWidth + 'px');
+
+        // 为本行每个水平线段添加方向箭头（不处理换行处横线）
+        const isReverseRow = row.classList.contains('reverse');
+        const rowRect = row.getBoundingClientRect();
+        const rowCenterY = rowRect.height / 2;
+        for (let seg = 0; seg < stations.length - 1; seg++) {
+            const aRect = stations[seg].getBoundingClientRect();
+            const bRect = stations[seg + 1].getBoundingClientRect();
+            const aX = aRect.left + aRect.width / 2;
+            const bX = bRect.left + bRect.width / 2;
+            const midX = (aX + bX) / 2 - rowRect.left;
+            const arrow = document.createElement('div');
+            
+            const rowStartIndex = parseInt(row.dataset.startIndex || '-1');
+            const globalNextIndex = parseInt(document.getElementById('metro-line').dataset.nextIndex || '-1');
+            const laterIndex = (isNaN(rowStartIndex) ? (seg + 1) : (rowStartIndex + seg + 1));
+
+            // 仅在活动区间内绘制箭头；活动外的线段保持静止且不显示箭头
+            let activeStartIdx = -1, activeEndIdx = -1;
+            if (fullRouteMode) {
+                const activeIndices = currentRouteStations.length ? lineInfo.map((s, i) => currentRouteSet.has(s.station_name) ? i : -1).filter(i => i >= 0) : [];
+                activeStartIdx = activeIndices.length ? Math.min(...activeIndices) : -1;
+                activeEndIdx = activeIndices.length ? Math.max(...activeIndices) : -1;
+            }
+            const segAIdx = isNaN(rowStartIndex) ? seg : (rowStartIndex + seg);
+            const segBIdx = segAIdx + 1;
+            if (fullRouteMode && !(segAIdx >= activeStartIdx && segAIdx <= activeEndIdx) && !(segBIdx >= activeStartIdx && segBIdx <= activeEndIdx)) {
+                continue;
+            }
+
+            let colorClass = 'black';
+            if (!isNaN(globalNextIndex) && !isNaN(laterIndex)) {
+                if (laterIndex < globalNextIndex) colorClass = 'gray';
+                else if (laterIndex === globalNextIndex) colorClass = 'red';
+            }
+            
+            arrow.className = 'direction-arrow ' + colorClass;
+            arrow.textContent = isReverseRow ? '←' : '→';
+            arrow.style.left = midX + 'px';
+            arrow.style.top = rowCenterY + 'px';
+            arrow.style.transform = 'translate(-50%, -50%)';
+            row.appendChild(arrow);
+        }
+    });
+
+    // connector cap style moved to CSS <style> block
+    
+    // 计算全局活动区间（用于连接线灰显判断）
+    let activeStartIdx = -1, activeEndIdx = -1;
+    if (fullRouteMode) {
+        const activeIndices = currentRouteStations.length ? lineInfo.map((s, i) => currentRouteSet.has(s.station_name) ? i : -1).filter(i => i >= 0) : [];
+        activeStartIdx = activeIndices.length ? Math.min(...activeIndices) : -1;
+        activeEndIdx = activeIndices.length ? Math.max(...activeIndices) : -1;
+    }
+
+    // 再绘制每两行之间的平滑垂直连接
+    for (let i = 0; i < rows.length - 1; i++) {
+        const upper = rows[i];
+        const lower = rows[i + 1];
+        const upperStations = Array.from(upper.querySelectorAll('.station-node'));
+        const lowerStations = Array.from(lower.querySelectorAll('.station-node'));
+        if (upperStations.length === 0 || lowerStations.length === 0) continue;
+        
+        // 连接侧：偶数索引行（第1、3...）连接右侧，奇数索引行连接左侧
+        const side = i % 2 === 0 ? 'right' : 'left';
+        const sgn = side === 'right' ? 1 : -1;
+        const outward = 35; // 向外偏移以美化转角
+        
+        function endpointX(row, stations, side) {
+            let rect;
+            if (side === 'right') {
+                rect = row.classList.contains('reverse') ? stations[0].getBoundingClientRect() : stations[stations.length - 1].getBoundingClientRect();
+            } else { // left
+                rect = row.classList.contains('reverse') ? stations[stations.length - 1].getBoundingClientRect() : stations[0].getBoundingClientRect();
+            }
+            return rect.left + rect.width / 2 - metroRect.left;
+        }
+        
+        const xUpper = endpointX(upper, upperStations, side);
+        const xLower = endpointX(lower, lowerStations, side);
+        const yUpper = upper.getBoundingClientRect().top + upper.getBoundingClientRect().height / 2 - metroRect.top;
+        const yLower = lower.getBoundingClientRect().top + lower.getBoundingClientRect().height / 2 - metroRect.top;
+        
+        // 竖直线外移到行端外侧
+        const xOut = xUpper + sgn * outward;
+        
+        // 颜色逻辑：仅在连接线位于当前子路线活动区间内时才着色；并结合“下一站”位置控制是否为未经过（主题色）
+        const themeColor = getComputedStyle(metroLine).getPropertyValue('--theme-color').trim() || '#9b5de5';
+        const globalNextIndex = parseInt(metroLine.dataset.nextIndex || '-1');
+        const upperStartIndex = parseInt(upper.dataset.startIndex || '-1');
+        const upperEndIndex = parseInt(upper.dataset.endIndex || '-1');
+        const lowerStartIndex = parseInt(lower.dataset.startIndex || '-1');
+        const lowerEndIndex = parseInt(lower.dataset.endIndex || '-1');
+        function endpointGlobalIndex(rowEl, sideSel, startIdx, endIdx) {
+            const isRev = rowEl.classList.contains('reverse');
+            if (sideSel === 'right') {
+                return isRev ? startIdx : endIdx;
+            } else {
+                return isRev ? endIdx : startIdx;
+            }
+        }
+        const upIdx = endpointGlobalIndex(upper, side, upperStartIndex, upperEndIndex);
+        const lowIdx = endpointGlobalIndex(lower, side, lowerStartIndex, lowerEndIndex);
+        const connectorActive = !fullRouteMode ? true : (
+            upIdx >= activeStartIdx && upIdx <= activeEndIdx &&
+            lowIdx >= activeStartIdx && lowIdx <= activeEndIdx
+        );
+        const shouldColor = connectorActive && (!isNaN(globalNextIndex) && !isNaN(lowerStartIndex) && globalNextIndex < lowerStartIndex);
+        
+        // 避免亚像素缝隙：所有关键坐标取整
+        const xUpperR = Math.round(xUpper);
+        const xLowerR = Math.round(xLower);
+        const yUpperR = Math.round(yUpper);
+        const yLowerR = Math.round(yLower);
+        const xOutR = Math.round(xOut);
+        
+        // 顶部水平过渡段：从行端到外移位置（在圆弧帽下方额外延伸半个厚度以避免缝隙）
+        const hTop = document.createElement('div');
+        hTop.className = 'connector horizontal';
+        hTop.style.position = 'absolute';
+        // 顶部水平段：根据朝向决定延伸方向（右向：延伸到右；左向：延伸到左）
+        let leftStartTop = Math.min(xUpperR, xOutR);
+        let rightEndTop = Math.max(xUpperR, xOutR);
+        if (sgn > 0) {
+            rightEndTop += thickness / 2; // 朝右时，向右延伸覆盖圆弧帽
+        } else {
+            leftStartTop -= thickness / 2; // 朝左时，向左延伸覆盖圆弧帽
+        }
+        hTop.style.left = leftStartTop + 'px';
+        hTop.style.top = yUpperR + 'px';
+        hTop.style.transform = 'translateY(-50%)';
+        hTop.style.width = (rightEndTop - leftStartTop) + 'px';
+        hTop.style.height = thickness + 'px';
+        hTop.style.borderRadius = (thickness / 2) + 'px';
+        hTop.style.zIndex = '1';
+        if (shouldColor) hTop.style.backgroundColor = themeColor;
+        metroLine.appendChild(hTop);
+        
+        // 顶部圆弧帽（尺寸随厚度、层级更高以覆盖接缝）
+        const capTop = document.createElement('div');
+        capTop.className = 'connector cap';
+        capTop.style.left = (xOutR - thickness / 2) + 'px';
+        capTop.style.top = (yUpperR - thickness / 2) + 'px';
+        capTop.style.width = thickness + 'px';
+        capTop.style.height = thickness + 'px';
+        capTop.style.zIndex = '2';
+        if (shouldColor) capTop.style.backgroundColor = themeColor;
+        metroLine.appendChild(capTop);
+        
+        // 垂直段：与两端圆弧帽重叠半径
+        const v = document.createElement('div');
+        v.className = 'connector vertical';
+        v.style.position = 'absolute';
+        v.style.left = (xOutR - thickness / 2) + 'px';
+        v.style.top = (yUpperR - thickness / 2) + 'px';
+        v.style.height = (yLowerR - yUpperR + thickness) + 'px';
+        v.style.width = thickness + 'px';
+        v.style.transform = 'none';
+        v.style.borderRadius = (thickness / 2) + 'px';
+        v.style.zIndex = '1';
+        if (shouldColor) v.style.backgroundColor = themeColor;
+        metroLine.appendChild(v);
+        
+        // 竖直方向箭头（只在竖直段加），仅在活动区间内绘制
+        if (connectorActive) {
+            const arrowV = document.createElement('div');
+            const lowerIsReverse = lower.classList.contains('reverse');
+            let laterIndexV;
+            if (side === 'right') {
+                laterIndexV = lowerIsReverse ? lowerStartIndex : lowerEndIndex;
+            } else {
+                laterIndexV = lowerIsReverse ? lowerEndIndex : lowerStartIndex;
+            }
+            let colorClassV = 'black';
+            if (!isNaN(globalNextIndex) && !isNaN(laterIndexV)) {
+                if (laterIndexV < globalNextIndex) colorClassV = 'gray';
+                else if (laterIndexV === globalNextIndex) colorClassV = 'red';
+            }
+            arrowV.className = 'direction-arrow ' + colorClassV;
+            arrowV.textContent = '↓';
+            arrowV.style.left = xOutR + 'px';
+            arrowV.style.top = Math.round((yUpperR + yLowerR) / 2) + 'px';
+            arrowV.style.transform = 'translate(-50%, -50%)';
+            metroLine.appendChild(arrowV);
+        }
+        
+        // 底部圆弧帽（尺寸随厚度、层级更高以覆盖接缝）
+        const capBottom = document.createElement('div');
+        capBottom.className = 'connector cap';
+        capBottom.style.left = (xOutR - thickness / 2) + 'px';
+        capBottom.style.top = (yLowerR - thickness / 2) + 'px';
+        capBottom.style.width = thickness + 'px';
+        capBottom.style.height = thickness + 'px';
+        capBottom.style.zIndex = '2';
+        if (shouldColor) capBottom.style.backgroundColor = themeColor;
+        metroLine.appendChild(capBottom);
+        
+        // 底部水平过渡段：从外移位置回到下行端（在圆弧帽下方额外延伸半个厚度以避免缝隙）
+        const hBottom = document.createElement('div');
+        hBottom.className = 'connector horizontal';
+        hBottom.style.position = 'absolute';
+        // 底部水平段：根据朝向决定延伸方向
+        // 规则：一端向外延伸覆盖圆弧帽，另一端向行内延伸覆盖行端圆角，确保双侧无缝
+        let leftStartBottom = Math.min(xOutR, xLowerR);
+        let rightEndBottom = Math.max(xOutR, xLowerR);
+        if (sgn > 0) {
+            // 右向：起点在左、终点在右
+            leftStartBottom -= thickness / 2;   // 向左延伸覆盖底部圆弧帽
+            rightEndBottom += thickness / 2;    // 向右延伸少量覆盖行端圆角
+        } else {
+            // 左向：起点在右、终点在左
+            rightEndBottom += thickness / 2;    // 向右延伸覆盖底部圆弧帽
+            leftStartBottom -= thickness / 2;   // 向左延伸少量覆盖行端圆角
+        }
+        hBottom.style.left = leftStartBottom + 'px';
+        hBottom.style.top = yLowerR + 'px';
+        hBottom.style.transform = 'translateY(-50%)';
+        hBottom.style.width = (rightEndBottom - leftStartBottom) + 'px';
+        hBottom.style.height = thickness + 'px';
+        hBottom.style.borderRadius = (thickness / 2) + 'px';
+        hBottom.style.zIndex = '1';
+        if (shouldColor) hBottom.style.backgroundColor = themeColor;
+        metroLine.appendChild(hBottom);
+    }
+
+}
+
+
+// 设定徽章背景色
+function setTransferBadgeColors() {
+    document.querySelectorAll('.transfer-badge[data-color]').forEach(el => {
+        const c = el.getAttribute('data-color');
+        if (c) el.style.backgroundColor = c;
+    });
+}
+
+// 为换乘站创建旋转多色环
+function createTransferRings() {
+    document.querySelectorAll('.station-node').forEach(node => {
+        const circle = node.querySelector('.station-circle.transfer');
+        if (!circle) return;
+        
+        const themeColor = getComputedStyle(circle).getPropertyValue('--theme-color').trim() || '#9b5de5';
+        const badgeEls = node.querySelectorAll('.transfer-badge[data-color]');
+        const colors = [themeColor];
+        
+        badgeEls.forEach(b => {
+            const c = b.getAttribute('data-color');
+            if (c) colors.push(c);
+        });
+        
+        const share = 100 / colors.length;
+        let start = 0;
+        const parts = colors.map((clr) => {
+            const end = start + share;
+            const seg = `${clr} ${start}% ${end}%`;
+            start = end;
+            return seg;
+        });
+        
+        const ring = document.createElement('span');
+        ring.style.position = 'absolute';
+        ring.style.inset = '-2px';
+        ring.style.borderRadius = '50%';
+        ring.style.background = `conic-gradient(${parts.join(', ')})`;
+        ring.style.zIndex = '0';
+        
+        // 非当前子路线的换乘环保持静止；仅对活动且未经过的换乘站启用旋转
+        const isInactive = circle.classList.contains('inactive');
+        if (!circle.classList.contains('passed') && !isInactive) {
+            ring.style.animation = 'spin 4s linear infinite';
+        }
+        
+        circle.appendChild(ring);
+    });
+}
+
+// 滚动到下一站
+function scrollToNextStation() {
+    const nextStation = document.querySelector('.station-node .station-circle.next');
+    if (nextStation) {
+        nextStation.closest('.station-node').scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center', 
+            inline: 'center' 
+        });
+    }
+}
+
+// 窗口大小变化时重新布局
+function handleResize() {
+    createZigzagLayout();
+    computeRailAndConnectors();
+    setTransferBadgeColors();
+    createTransferRings();
+}
+
+function init() {
+    createZigzagLayout();
+    computeRailAndConnectors();
+    setTransferBadgeColors();
+    createTransferRings();
+    scrollToNextStation();
+    
+    // 监听窗口大小变化
+    window.addEventListener('resize', handleResize);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+{% endblock %}

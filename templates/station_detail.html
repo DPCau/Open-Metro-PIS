@@ -1,0 +1,321 @@
+{% extends 'base.html' %}
+
+{% block title %}站点详情{% endblock %}
+
+{% block page_title %}
+    <div class="station-detail-title">
+        <span class="station-detail-name">{% if next_station_info %}{{ next_station_info.station_name }}{% else %}{{ next_station }}{% endif %}</span>
+        <span class="station-detail-name-en">{% if next_station_info %}{{ next_station_info.station_name_en }}{% else %}{{ next_station }}{% endif %}</span>
+    </div>
+{% endblock %}
+
+{% block head %}
+<style>
+    :root { --theme-color: #9b5de5; }
+    .station-detail-title {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .station-detail-name {
+        font-size: 28px;
+        font-weight: bold;
+        color: #fff;
+    }
+    
+    .station-detail-name-en {
+        font-size: 16px;
+        color: #fff;
+        opacity: 0.8;
+    }
+    
+    .station-content {
+        background-color: #fff;
+        border-radius: 10px;
+        padding: 20px;
+        margin: 20px 0;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .detail-section {
+        margin-bottom: 25px;
+    }
+    
+    .detail-section:last-child {
+        margin-bottom: 0;
+    }
+    
+    .section-title {
+        font-size: 20px;
+        font-weight: bold;
+        color: var(--theme-color);
+        margin-bottom: 15px;
+        border-left: 4px solid var(--theme-color);
+        padding-left: 10px;
+    }
+    
+    .exit-info {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+    }
+    
+    .exit-item {
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 12px;
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    
+    .exit-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .exit-number {
+        font-size: 18px;
+        font-weight: bold;
+        color: var(--theme-color);
+        min-width: 30px;
+    }
+    
+    .exit-details {
+        flex: 1;
+    }
+    
+    .exit-name {
+        font-weight: bold;
+        color: #333;
+        margin-bottom: 5px;
+    }
+    
+    .exit-description {
+        font-size: 14px;
+        color: #666;
+        line-height: 1.4;
+    }
+    
+    .transfer-info {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .transfer-card {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+    }
+    
+    .transfer-line {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+        font-weight: bold;
+        color: #fff;
+        background-color: var(--theme-color);
+    }
+    
+    .transfer-details {
+        flex: 1;
+    }
+    
+    .transfer-title {
+        font-weight: bold;
+        color: #333;
+        font-size: 18px;
+        margin-bottom: 5px;
+    }
+    
+    .transfer-description {
+        font-size: 14px;
+        color: #666;
+    }
+    
+    .facility-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+    }
+    
+    .facility-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 15px;
+        color: #333;
+    }
+    
+    .facility-icon {
+        width: 20px;
+        height: 20px;
+        background-color: var(--theme-color);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 12px;
+    }
+    
+    .station-index {
+        font-size: 16px;
+        color: #666;
+        line-height: 1.6;
+    }
+    
+    .station-index strong {
+        color: var(--theme-color);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    <div class="station-content" style="--theme-color: {{ line_color or '#9b5de5' }};">
+        <!-- 出口信息 -->
+        <div class="detail-section">
+            <h3 class="section-title">出口信息</h3>
+            <div class="exit-info">
+                <div class="exit-item">
+                    <div class="exit-number">A</div>
+                    <div class="exit-details">
+                        <div class="exit-name">A出口</div>
+                        <div class="exit-description">天府大道南段、龙马路、公交站</div>
+                    </div>
+                </div>
+                
+                <div class="exit-item">
+                    <div class="exit-number">B</div>
+                    <div class="exit-details">
+                        <div class="exit-name">B出口</div>
+                        <div class="exit-description">天府大道南段、龙马路、停车场</div>
+                    </div>
+                </div>
+                
+                <div class="exit-item">
+                    <div class="exit-number">C</div>
+                    <div class="exit-details">
+                        <div class="exit-name">C出口</div>
+                        <div class="exit-description">天府大道南段、华阳大道、商业中心</div>
+                    </div>
+                </div>
+                
+                <div class="exit-item">
+                    <div class="exit-number">D</div>
+                    <div class="exit-details">
+                        <div class="exit-name">D出口</div>
+                        <div class="exit-description">天府大道南段、华阳大道、住宅区</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 换乘信息 -->
+        <div class="detail-section">
+            <h3 class="section-title">换乘信息</h3>
+            <div class="transfer-info">
+                {% if transfer_badges and transfer_badges|length > 0 %}
+                    <div class="transfer-badges" style="display:flex; gap:8px; flex-wrap:wrap;">
+                        {% for b in transfer_badges %}
+                        <div class="transfer-badge" style="width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#fff;" data-color="{{ b.color }}">{{ b.code }}</div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="transfer-card">
+                        <div class="transfer-line">-</div>
+                        <div class="transfer-details">
+                            <div class="transfer-title">无换乘</div>
+                            <div class="transfer-description">当前站无可换乘线路</div>
+                        </div>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- 站点设施 -->
+        <div class="detail-section">
+            <h3 class="section-title">站点设施</h3>
+            <div class="facility-list">
+                <div class="facility-item">
+                    <div class="facility-icon">WC</div>
+                    <span>卫生间</span>
+                </div>
+                <div class="facility-item">
+                    <div class="facility-icon">无障碍</div>
+                    <span>无障碍设施</span>
+                </div>
+                <div class="facility-item">
+                    <div class="facility-icon">ATM</div>
+                    <span>自动取款机</span>
+                </div>
+                <div class="facility-item">
+                    <div class="facility-icon">商</div>
+                    <span>商业服务</span>
+                </div>
+                <div class="facility-item">
+                    <div class="facility-icon">饮水</div>
+                    <span>直饮水</span>
+                </div>
+                <div class="facility-item">
+                    <div class="facility-icon">客服</div>
+                    <span>客服中心</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 站点索引 -->
+        <div class="detail-section">
+            <h3 class="section-title">站点索引</h3>
+            <div class="station-index">
+                <p>当前站点位于5号线，距起点站回龙站约<strong>2</strong>站，距终点站华桂路站约<strong>38</strong>站。</p>
+                <p>站点编码：<strong>{% if next_station_info and next_station_info.station_index %}{{ next_station_info.station_index }}{% else %}暂无{% endif %}</strong></p>
+                <p>站点位置：<strong>{% if next_station_info and next_station_info.station_index %}第{{ next_station_info.station_index }}站{% else %}未知{% endif %}</strong></p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="navigation-buttons" style="margin-top: 30px; display: flex; justify-content: center; gap: 20px;">
+        <button class="btn" onclick="navigateTo('/')">返回首页</button>
+        <button class="btn" onclick="navigateTo('/next_station')">下一站信息</button>
+        <button class="btn" onclick="navigateTo('/line_map')">查看线路图</button>
+        <button class="btn" onclick="navigateTo('/arrival')">到站信息</button>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 站点详情页面加载完成
+        console.log('站点详情页面加载完成');
+        
+        // 可以在这里添加交互效果
+        const exitItems = document.querySelectorAll('.exit-item');
+        exitItems.forEach(item => {
+            item.addEventListener('click', function() {
+                // 可以添加点击出口显示更详细信息的功能
+                console.log('点击了出口：', this.querySelector('.exit-number').textContent);
+            });
+        });
+
+        // 通过 data-color 设置换乘徽章背景色，避免CSS模板表达式
+        document.querySelectorAll('.transfer-badge[data-color]').forEach(el => {
+            const color = el.getAttribute('data-color');
+            if (color) {
+                el.style.backgroundColor = color;
+            }
+        });
+    });
+</script>
+{% endblock %}
