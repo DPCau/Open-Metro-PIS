@@ -7,7 +7,7 @@
     .line-map-container {
         width: 100%;
         padding: 20px 0;
-        overflow: visible;
+        overflow: hidden; /* 保证内容不超出白色画布 */
     }
     
     .line-map {
@@ -21,6 +21,7 @@
         align-items: center;
         justify-content: flex-start;
         gap: 60px;
+        margin-top: 20px;
         margin-bottom: 40px;
         position: relative;
         width: 100%;
@@ -278,15 +279,24 @@
 <div class="line-map-container">
     <div class="line-map" style="--theme-color: {{ line_color or '#9b5de5' }};">
         
+        <!-- 普通线路容器 -->
         <div class="metro-line" id="metro-line">
             <!-- 线路行将通过JavaScript动态生成 -->
         </div>
+        <!-- 环线容器 -->
+        <div class="ring-line" id="ring-line" style="display:none;">
+            <!-- SVG环形轨道与站点将通过JavaScript动态生成 -->
+        </div>
         <!-- 将数据以JSON脚本标签形式注入，避免内联JS语法冲突 -->
         <script id="line-info-data" type="application/json">{{ line_info | tojson }}</script>
-    <script id="current-route-stations-data" type="application/json">{{ current_route_stations | tojson }}</script>
-    <script id="full-route-mode-data" type="application/json">{{ full_route_mode | tojson }}</script>
+        <script id="current-route-stations-data" type="application/json">{{ current_route_stations | tojson }}</script>
+        <script id="full-route-mode-data" type="application/json">{{ full_route_mode | tojson }}</script>
         <script id="next-station-data" type="application/json">{{ next_station | tojson }}</script>
         <script id="is-reversed-data" type="application/json">{{ is_reversed | tojson }}</script>
+        <script id="is-loop-data" type="application/json">{{ is_loop | tojson }}</script>
+        <script id="loop-has-terminal-data" type="application/json">{{ loop_has_terminal | tojson }}</script>
+        <script id="loop-terminal-station-data" type="application/json">{{ loop_terminal_station | tojson }}</script>
+        <script id="derection-data" type="application/json">{{ direction | tojson }}</script>
     </div>
 </div>
 
@@ -307,6 +317,8 @@ const fullRouteMode = JSON.parse(document.getElementById('full-route-mode-data')
 const currentRouteSet = new Set(currentRouteStations);
 const nextStationName = JSON.parse(document.getElementById('next-station-data')?.textContent || 'null');
 const isReversed = JSON.parse(document.getElementById('is-reversed-data')?.textContent || 'false');
+const isLoop = JSON.parse(document.getElementById('is-loop-data')?.textContent || 'false');
+const derection = parseInt(document.getElementById('derection-data')?.textContent || '0');
 
 // 创建站点节点HTML
 function createStationNode(station) {
@@ -337,12 +349,14 @@ function createStationNode(station) {
 
 // 计算每行能容纳的站点数量
 function calculateStationsPerRow() {
-    const containerWidth = document.querySelector('.line-map-container').offsetWidth;
+    const container = document.querySelector('.line-map-container');
+    // 更稳健的宽度测量，避免初次渲染方向切换导致的宽度偏差
+    const containerWidth = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
     const stationWidth = 80; // 站点节点宽度
     const gap = 60; // 站点间距
     const margin = 40; // 边距
     
-    const availableWidth = containerWidth - margin * 2;
+    const availableWidth = Math.max(0, containerWidth - margin * 2);
     const stationsPerRow = Math.floor(availableWidth / (stationWidth + gap));
     
     return Math.max(1, stationsPerRow);
@@ -413,6 +427,7 @@ function computeRailAndConnectors() {
     const metroLine = document.getElementById('metro-line');
     const metroRect = metroLine.getBoundingClientRect();
     const thickness = 15; // 轨道厚度，与CSS保持一致
+    const metroWidth = Math.floor(metroRect.width || metroLine.clientWidth || metroLine.offsetWidth || 0);
 
     const rows = Array.from(document.querySelectorAll('.line-row'));
 
@@ -445,7 +460,8 @@ function computeRailAndConnectors() {
         const railLeft = Math.min(firstCenterX, lastCenterX) - rowLeft;
         const railWidth = Math.abs(lastCenterX - firstCenterX);
         
-        row.style.setProperty('--rail-left', railLeft + 'px');
+        // 左侧越界保护，避免负 left 导致轨道起点在容器外
+        row.style.setProperty('--rail-left', Math.max(0, railLeft) + 'px');
         row.style.setProperty('--rail-width', railWidth + 'px');
 
         // 根据全局“下一站”索引判断整行着色逻辑
@@ -453,7 +469,7 @@ function computeRailAndConnectors() {
         const rowStart = parseInt(row.dataset.startIndex || '-1');
         const rowEnd = parseInt(row.dataset.endIndex || '-1');
 
-        let coloredLeft = railLeft;
+        let coloredLeft = Math.max(0, railLeft);
         let coloredWidth = 0;
 
         // 计算当前子路线的全局活动区间（activeStart..activeEnd）
@@ -514,16 +530,16 @@ function computeRailAndConnectors() {
                         coloredLeft = Math.min(startX, endX) - rowLeft;
                         coloredWidth = Math.abs(endX - startX);
                     } else {
-                        coloredLeft = railLeft;
+                        coloredLeft = Math.max(0, railLeft);
                         coloredWidth = 0;
                     }
                 } else {
-                    coloredLeft = railLeft;
+                    coloredLeft = Math.max(0, railLeft);
                     coloredWidth = railWidth;
                 }
             } else {
                 // 下一站在本行之后：本行已全部经过，仅将活动区间站标记为已过
-                coloredLeft = railLeft;
+                coloredLeft = Math.max(0, railLeft);
                 coloredWidth = 0;
                 stations.forEach((station, idx) => {
                     const globalIdx = rowStart + idx;
@@ -534,19 +550,21 @@ function computeRailAndConnectors() {
             }
         }
         
-        row.style.setProperty('--rail-colored-left', coloredLeft + 'px');
+        // 左侧越界保护，避免彩色段起点在容器外
+        row.style.setProperty('--rail-colored-left', Math.max(0, coloredLeft) + 'px');
         row.style.setProperty('--rail-colored-width', coloredWidth + 'px');
 
         // 为本行每个水平线段添加方向箭头（不处理换行处横线）
         const isReverseRow = row.classList.contains('reverse');
-        const rowRect = row.getBoundingClientRect();
-        const rowCenterY = rowRect.height / 2;
+        const rowCenterY = row.getBoundingClientRect().height / 2;
         for (let seg = 0; seg < stations.length - 1; seg++) {
             const aRect = stations[seg].getBoundingClientRect();
             const bRect = stations[seg + 1].getBoundingClientRect();
             const aX = aRect.left + aRect.width / 2;
             const bX = bRect.left + bRect.width / 2;
-            const midX = (aX + bX) / 2 - rowRect.left;
+            let midX = (aX + bX) / 2 - row.getBoundingClientRect().left;
+            // 左侧越界保护，保证箭头不会在行容器外
+            midX = Math.max(0, Math.min(row.getBoundingClientRect().width, midX));
             const arrow = document.createElement('div');
             
             const rowStartIndex = parseInt(row.dataset.startIndex || '-1');
@@ -645,25 +663,30 @@ function computeRailAndConnectors() {
         );
         const shouldColor = connectorActive && (!isNaN(globalNextIndex) && !isNaN(lowerStartIndex) && globalNextIndex < lowerStartIndex);
         
-        // 避免亚像素缝隙：所有关键坐标取整
+        // 避免亚像素缝隙：所有关键坐标取整，并对左侧越界做保护
         const xUpperR = Math.round(xUpper);
         const xLowerR = Math.round(xLower);
         const yUpperR = Math.round(yUpper);
         const yLowerR = Math.round(yLower);
-        const xOutR = Math.round(xOut);
+        let xOutR = Math.round(xOut);
+        // 左边界保护，避免大外移或方向切换导致的负值
+        const xOutRClamped = Math.max(thickness / 2, Math.min(metroWidth - thickness / 2, xOutR));
         
         // 顶部水平过渡段：从行端到外移位置（在圆弧帽下方额外延伸半个厚度以避免缝隙）
         const hTop = document.createElement('div');
         hTop.className = 'connector horizontal';
         hTop.style.position = 'absolute';
         // 顶部水平段：根据朝向决定延伸方向（右向：延伸到右；左向：延伸到左）
-        let leftStartTop = Math.min(xUpperR, xOutR);
-        let rightEndTop = Math.max(xUpperR, xOutR);
+        let leftStartTop = Math.min(xUpperR, xOutRClamped);
+        let rightEndTop = Math.max(xUpperR, xOutRClamped);
         if (sgn > 0) {
             rightEndTop += thickness / 2; // 朝右时，向右延伸覆盖圆弧帽
         } else {
             leftStartTop -= thickness / 2; // 朝左时，向左延伸覆盖圆弧帽
         }
+        // 左边界保护
+        leftStartTop = Math.max(0, leftStartTop);
+        rightEndTop = Math.max(leftStartTop, Math.min(metroWidth, rightEndTop));
         hTop.style.left = leftStartTop + 'px';
         hTop.style.top = yUpperR + 'px';
         hTop.style.transform = 'translateY(-50%)';
@@ -677,7 +700,7 @@ function computeRailAndConnectors() {
         // 顶部圆弧帽（尺寸随厚度、层级更高以覆盖接缝）
         const capTop = document.createElement('div');
         capTop.className = 'connector cap';
-        capTop.style.left = (xOutR - thickness / 2) + 'px';
+        capTop.style.left = (xOutRClamped - thickness / 2) + 'px';
         capTop.style.top = (yUpperR - thickness / 2) + 'px';
         capTop.style.width = thickness + 'px';
         capTop.style.height = thickness + 'px';
@@ -689,7 +712,7 @@ function computeRailAndConnectors() {
         const v = document.createElement('div');
         v.className = 'connector vertical';
         v.style.position = 'absolute';
-        v.style.left = (xOutR - thickness / 2) + 'px';
+        v.style.left = (xOutRClamped - thickness / 2) + 'px';
         v.style.top = (yUpperR - thickness / 2) + 'px';
         v.style.height = (yLowerR - yUpperR + thickness) + 'px';
         v.style.width = thickness + 'px';
@@ -716,7 +739,7 @@ function computeRailAndConnectors() {
             }
             arrowV.className = 'direction-arrow ' + colorClassV;
             arrowV.textContent = '↓';
-            arrowV.style.left = xOutR + 'px';
+            arrowV.style.left = xOutRClamped + 'px';
             arrowV.style.top = Math.round((yUpperR + yLowerR) / 2) + 'px';
             arrowV.style.transform = 'translate(-50%, -50%)';
             metroLine.appendChild(arrowV);
@@ -725,7 +748,7 @@ function computeRailAndConnectors() {
         // 底部圆弧帽（尺寸随厚度、层级更高以覆盖接缝）
         const capBottom = document.createElement('div');
         capBottom.className = 'connector cap';
-        capBottom.style.left = (xOutR - thickness / 2) + 'px';
+        capBottom.style.left = (xOutRClamped - thickness / 2) + 'px';
         capBottom.style.top = (yLowerR - thickness / 2) + 'px';
         capBottom.style.width = thickness + 'px';
         capBottom.style.height = thickness + 'px';
@@ -739,8 +762,8 @@ function computeRailAndConnectors() {
         hBottom.style.position = 'absolute';
         // 底部水平段：根据朝向决定延伸方向
         // 规则：一端向外延伸覆盖圆弧帽，另一端向行内延伸覆盖行端圆角，确保双侧无缝
-        let leftStartBottom = Math.min(xOutR, xLowerR);
-        let rightEndBottom = Math.max(xOutR, xLowerR);
+        let leftStartBottom = Math.min(xOutRClamped, xLowerR);
+        let rightEndBottom = Math.max(xOutRClamped, xLowerR);
         if (sgn > 0) {
             // 右向：起点在左、终点在右
             leftStartBottom -= thickness / 2;   // 向左延伸覆盖底部圆弧帽
@@ -750,6 +773,9 @@ function computeRailAndConnectors() {
             rightEndBottom += thickness / 2;    // 向右延伸覆盖底部圆弧帽
             leftStartBottom -= thickness / 2;   // 向左延伸少量覆盖行端圆角
         }
+        // 左边界保护
+        leftStartBottom = Math.max(0, leftStartBottom);
+        rightEndBottom = Math.max(leftStartBottom, Math.min(metroWidth, rightEndBottom));
         hBottom.style.left = leftStartBottom + 'px';
         hBottom.style.top = yLowerR + 'px';
         hBottom.style.transform = 'translateY(-50%)';
@@ -760,7 +786,6 @@ function computeRailAndConnectors() {
         if (shouldColor) hBottom.style.backgroundColor = themeColor;
         metroLine.appendChild(hBottom);
     }
-
 }
 
 
@@ -820,28 +845,298 @@ function scrollToNextStation() {
         nextStation.closest('.station-node').scrollIntoView({ 
             behavior: 'smooth', 
             block: 'center', 
-            inline: 'center' 
+            inline: 'nearest' // 避免水平滚动导致内容抖动与画布外定位
         });
     }
 }
 
 // 窗口大小变化时重新布局
 function handleResize() {
-    createZigzagLayout();
-    computeRailAndConnectors();
-    setTransferBadgeColors();
-    createTransferRings();
+    if (JSON.parse(document.getElementById('is-loop-data')?.textContent || 'false')) {
+        renderLoopMap();
+    } else {
+        createZigzagLayout();
+        computeRailAndConnectors();
+        setTransferBadgeColors();
+        createTransferRings();
+    }
 }
 
 function init() {
-    createZigzagLayout();
-    computeRailAndConnectors();
+    if (JSON.parse(document.getElementById('is-loop-data')?.textContent || 'false')) {
+        renderLoopMap();
+        scrollToNextStation();
+        window.addEventListener('resize', handleResize);
+    } else {
+        createZigzagLayout();
+        computeRailAndConnectors();
+        setTransferBadgeColors();
+        createTransferRings();
+        scrollToNextStation();
+        // 线性布局首次渲染后做一次延迟复测，修复 direction=1 时初次宽度与位置不稳定导致的左侧挤出
+        const metroLine = document.getElementById('metro-line');
+        if (metroLine && metroLine.dataset.settle !== 'done') {
+            metroLine.dataset.settle = 'pending';
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    metroLine.dataset.settle = 'done';
+                    createZigzagLayout();
+                    computeRailAndConnectors();
+                    setTransferBadgeColors();
+                    createTransferRings();
+                }, 60);
+            });
+        }
+        window.addEventListener('resize', handleResize);
+    }
+}
+
+function renderLoopMap() {
+    const rl = document.getElementById('ring-line');
+    const ml = document.getElementById('metro-line');
+    if (!rl || !ml) return;
+    rl.style.display = '';
+    ml.style.display = 'none';
+    rl.innerHTML = '';
+
+    const container = document.querySelector('.line-map-container');
+    const reserve = 160; // 为外侧标签和安全边留白，防止溢出
+    const minWidth = 680; // 缩小最小宽度
+    // 使用更稳定的尺寸测量，避免初次渲染因容器状态或滚动条导致偏差
+    const containerRectWidth = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
+    const width = Math.max(minWidth, containerRectWidth - reserve);
+    const height = Math.max(320, Math.min(520, Math.round(width * 0.45)));
+    const margin = 40;
+    const W = width - margin * 2;
+    const H = height - margin * 2;
+    const radius = Math.round(Math.min(W, H) * 0.12);
+    const ns = 'http://www.w3.org/2000/svg';
+
+     const svg = document.createElementNS(ns, 'svg');
+     svg.setAttribute('width', String(width));
+     svg.setAttribute('height', String(height));
+     svg.style.display = 'block';
+     // 让环线容器成为定位上下文，并设置固定尺寸
+     rl.style.position = 'relative';
+    rl.style.margin = '0 auto'; // 居中，避免贴边
+    rl.style.width = `${width}px`;
+    rl.style.height = `${height}px`;
+    // 让SVG与站点层叠在同一平面，SVG在下、站点在上
+    svg.style.position = 'absolute';
+    svg.style.top = '0';
+    svg.style.left = '0';
+    svg.style.zIndex = '0';
+
+    const base = document.createElementNS(ns, 'rect');
+    base.setAttribute('x', String(margin));
+    base.setAttribute('y', String(margin));
+    base.setAttribute('width', String(W));
+    base.setAttribute('height', String(H));
+    base.setAttribute('rx', String(radius));
+    base.setAttribute('ry', String(radius));
+    base.setAttribute('fill', 'none');
+    base.setAttribute('stroke', '#ddd');
+    base.setAttribute('stroke-width', '15');
+    svg.appendChild(base);
+
+    const group = document.createElement('div');
+    group.style.position = 'absolute';
+    group.style.left = '0';
+    group.style.top = '0';
+    group.style.width = `${width}px`;
+    group.style.height = `${height}px`;
+    group.style.zIndex = '1';
+    rl.appendChild(svg);
+    rl.appendChild(group);
+
+    const totalLen = (base.getTotalLength && base.getTotalLength()) || (2 * (W + H));
+    const n = lineInfo.length;
+    const nextIndex = lineInfo.findIndex(s => s.station_name === nextStationName);
+
+    // 根据站点编号重排：将编号'01'锚定到顶边中点，其余按逆时针一周布局（并去重避免重复首尾站）
+    const getStationNum = (s) => {
+        const idx = s.station_index;
+        if (Array.isArray(idx)) {
+            const v = idx[idx.length - 1];
+            const m = String(v || '').match(/^\d+$/);
+            return m ? parseInt(v, 10) : NaN;
+        } else {
+            const m = String(idx || '').match(/^\d+$/);
+            return m ? parseInt(idx, 10) : NaN;
+        }
+    };
+    const entries = lineInfo.map((s, i) => ({ s, i, num: getStationNum(s) }));
+    entries.sort((A, B) => {
+        const a = isNaN(A.num) ? Number.MAX_SAFE_INTEGER : A.num;
+        const b = isNaN(B.num) ? Number.MAX_SAFE_INTEGER : B.num;
+        return a - b;
+    });
+    const ordered = entries.map(e => e.s);
+    // 去重：以站名为键，保留首个出现的站
+    const seen = new Set();
+    const orderedUnique = [];
+    for (const s of ordered) {
+        const key = s.station_name || JSON.stringify(s.station_index);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        orderedUnique.push(s);
+    }
+    const nU = orderedUnique.length;
+    const anchorPos = orderedUnique.findIndex(s => getStationNum(s) === 1);
+    const seg = totalLen / nU;
+    const anchorOffset = (W - 2 * radius) / 2; // 顶边直线段的中点
+    const pts = [];
+
+    for (let i = 0; i < nU; i++) {
+        const stepsFromAnchor = ((i - (anchorPos >= 0 ? anchorPos : 0)) % nU + nU) % nU;
+        const d = (anchorOffset - seg * stepsFromAnchor + totalLen) % totalLen; // 逆时针：长度递减
+        const pt = (base.getPointAtLength ? base.getPointAtLength(d) : { x: margin + W / 2, y: margin });
+        pts.push(pt);
+        const tmp = document.createElement('div');
+        tmp.innerHTML = createStationNode(orderedUnique[i]);
+        const node = tmp.firstElementChild;
+        node.style.position = 'absolute';
+        node.style.left = `${pt.x}px`;
+        node.style.top = `${pt.y}px`;
+        node.style.transform = 'translate(-50%, -50%)';
+        // 站名外侧，换乘内侧（按所在边）
+        const labels = node.querySelector('.station-labels');
+        const badges = node.querySelector('.transfer-badges');
+        const tol = 20;
+        const labelOffset = 58; // 站名外侧偏移
+        const badgeOffset = 37; // 换乘徽章距离圆心偏移
+        if (labels) {
+            const circleR = 15; // 站点圆半径
+            const gapOut = 18;  // 站名外侧与圆的间距
+            const labelWidth = 140; // 与CSS保持一致
+            const nodeHalf = 40; // station-node宽80的一半
+            const safeMinX = margin + 8; // 画布左内边距
+            const safeMaxX = width - margin - 8; // 画布右内边距
+            if (Math.abs(pt.y - margin) < tol) {
+                // 顶边：外侧在上方
+                labels.style.top = `calc(50% - ${labelOffset}px)`;
+                labels.style.left = '50%';
+                labels.style.transform = 'translateX(-50%)';
+            } else if (Math.abs(pt.y - (margin + H)) < tol) {
+                // 底边：外侧在下方
+                labels.style.top = `calc(50% + ${labelOffset - 30}px)`;
+                labels.style.left = '50%';
+                labels.style.transform = 'translateX(-50%)';
+            } else if (Math.abs(pt.x - margin) < tol) {
+                // 左边：外侧在左方（带防溢出修正）
+                let A = circleR + gapOut;
+                const anchorX = pt.x + (nodeHalf - A);
+                const leftBound = anchorX - labelWidth;
+                if (leftBound < safeMinX) {
+                    const delta = safeMinX - leftBound;
+                    A = Math.max(0, A - delta);
+                }
+                labels.style.top = '50%';
+                labels.style.left = `calc(50% - ${A}px)`;
+                labels.style.transform = 'translate(-100%, -50%)';
+            } else {
+                // 右边：外侧在右方（带防溢出修正）
+                let A = circleR + gapOut;
+                const anchorX = pt.x + (nodeHalf + A);
+                const rightBound = anchorX + labelWidth;
+                if (rightBound > safeMaxX) {
+                    const delta = rightBound - safeMaxX;
+                    A = Math.max(0, A - delta);
+                }
+                labels.style.top = '50%';
+                labels.style.left = `calc(50% + ${A}px)`;
+                labels.style.transform = 'translate(0, -50%)';
+            }
+        }
+        if (badges) {
+            const circleR = 15; // 站点圆半径
+            const inset = 22;   // 徽章在圆内侧的间距
+            if (Math.abs(pt.y - margin) < tol) {
+                // 顶边：内侧在下方
+                badges.style.top = `calc(50% + ${badgeOffset}px)`;
+                badges.style.left = '50%';
+                badges.style.transform = 'translateX(-50%)';
+            } else if (Math.abs(pt.y - (margin + H)) < tol) {
+                // 底边：内侧在上方
+                badges.style.top = `calc(50% - ${badgeOffset}px)`;
+                badges.style.left = '50%';
+                badges.style.transform = 'translateX(-50%)';
+            } else if (Math.abs(pt.x - margin) < tol) {
+                // 左边：内侧在右方
+                badges.style.top = '50%';
+                badges.style.left = `calc(50% + ${circleR + inset}px)`;
+                badges.style.transform = 'translate(-50%, -50%)';
+            } else {
+                // 右边：内侧在左方
+                badges.style.top = '50%';
+                badges.style.left = `calc(50% - ${circleR + inset}px)`;
+                badges.style.transform = 'translate(-50%, -50%)';
+            }
+        }
+        // 静态线路图：不做已过站灰显
+        group.appendChild(node);
+    }
+
+    // 边段方向箭头：拐角处不显示（derection=0逆时针，derection=1顺时针）
+    for (let i = 0; i < nU; i++) {
+        const pA = pts[i];
+        const pB = pts[(derection === 0 ? (i + 1) : (i - 1 + nU)) % nU];
+        const midX = (pA.x + pB.x) / 2;
+        const midY = (pA.y + pB.y) / 2;
+        const dx = pB.x - pA.x;
+        const dy = pB.y - pA.y;
+        const inTopLeft = (x, y) => (x >= margin && x <= margin + radius) && (y >= margin && y <= margin + radius);
+        const inTopRight = (x, y) => (x >= margin + W - radius && x <= margin + W) && (y >= margin && y <= margin + radius);
+        const inBottomRight = (x, y) => (x >= margin + W - radius && x <= margin + W) && (y >= margin + H - radius && y <= margin + H);
+        const inBottomLeft = (x, y) => (x >= margin && x <= margin + radius) && (y >= margin + H - radius && y <= margin + H);
+        const nearCorner = (x, y) => inTopLeft(x, y) || inTopRight(x, y) || inBottomRight(x, y) || inBottomLeft(x, y);
+        if (nearCorner(midX, midY) || nearCorner(pA.x, pA.y) || nearCorner(pB.x, pB.y)) {
+            continue;
+        }
+        const arrow = document.createElement('div');
+        arrow.className = 'direction-arrow black';
+        let ch;
+        if (Math.abs(dx) >= Math.abs(dy)) {
+            ch = dx > 0 ? '→' : '←';
+        } else {
+            ch = dy > 0 ? '↓' : '↑';
+        }
+        arrow.textContent = ch;
+        arrow.style.position = 'absolute';
+        arrow.style.left = `${midX}px`;
+        arrow.style.top = `${midY}px`;
+        arrow.style.transform = 'translate(-50%, -50%)';
+        group.appendChild(arrow);
+    }
+
+    // 颜色叠加：静态主题色整环（移除灰段与“已过站”标记）
+    const themeColor = getComputedStyle(document.querySelector('.line-map')).getPropertyValue('--theme-color').trim() || '#9b5de5';
+    const colored = document.createElementNS(ns, 'rect');
+    colored.setAttribute('x', String(margin));
+    colored.setAttribute('y', String(margin));
+    colored.setAttribute('width', String(W));
+    colored.setAttribute('height', String(H));
+    colored.setAttribute('rx', String(radius));
+    colored.setAttribute('ry', String(radius));
+    colored.setAttribute('fill', 'none');
+    colored.setAttribute('stroke', themeColor);
+    colored.setAttribute('stroke-width', '15');
+    svg.appendChild(colored);
+
+    // 补充换乘徽章颜色与旋转环（保留）
     setTransferBadgeColors();
     createTransferRings();
-    scrollToNextStation();
-    
-    // 监听窗口大小变化
-    window.addEventListener('resize', handleResize);
+
+    // 首次渲染后做一次延迟复测，避免初次布局时宽度尚未稳定导致两侧溢出
+    if (rl && rl.dataset.settle !== 'done') {
+        rl.dataset.settle = 'pending';
+        requestAnimationFrame(() => {
+            setTimeout(() => {
+                rl.dataset.settle = 'done';
+                renderLoopMap();
+            }, 60);
+        });
+    }
 }
 
 document.addEventListener('DOMContentLoaded', init);

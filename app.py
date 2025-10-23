@@ -32,7 +32,7 @@ current_state = {
     'line_name': 'line_17',
     'route_name': 'route1',
     'next_station': '二仙桥',
-    'direction': 0, # 方向：0与数据文件顺序一致，1为反向（显示反转）
+    'direction': 1, # 方向：0与数据文件顺序一致，1为反向（显示反转）
     'door_side': '本侧',  # 本侧或对侧
     'current_time': '22:19',
     'current_carriage': 3
@@ -586,11 +586,41 @@ def line_map():
         except Exception as e:
             print(f"整理线路显示方向失败: {e}")
         
+        # 线路类型（环线/普通）
+        is_loop = False
+        try:
+            route_data = _get_route_data()
+            d = route_data.get(line_name, {})
+            is_loop = (d.get('type') == 'loop')
+        except Exception:
+            is_loop = False
+
+        # 环线终点字段（用于环线有/无终点的不同着色规则）
+        loop_has_terminal = False
+        loop_terminal_station = ''
+        try:
+            route_data = _get_route_data()
+            d = route_data.get(line_name, {})
+            services = d.get('services', [])
+            for s in services:
+                name = s.get('type') or s.get('service_name')
+                if name == route_name:
+                    term = (s.get('terminal_station') or '').strip()
+                    loop_has_terminal = bool(term)
+                    loop_terminal_station = term
+                    break
+        except Exception:
+            loop_has_terminal = False
+            loop_terminal_station = ''
+
         return render_template('line_map.html', 
                                 line_info=line_info,
                                 line_display_name=line_display_name,
                                 line_color=line_color,
                                 is_reversed=is_reversed,
+                                is_loop=is_loop,
+                                loop_has_terminal=loop_has_terminal,
+                                loop_terminal_station=loop_terminal_station,
                                 current_route_stations=current_route_stations,
                                 full_route_mode=full_route_mode,
                                 **current_state)
