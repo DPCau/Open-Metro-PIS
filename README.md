@@ -54,7 +54,7 @@ python app.py
 ```
 
 3. 访问系统：
-在浏览器中访问 http://localhost:5000
+在浏览器中访问 http://localhost:8089
 
 ## 数据说明
 

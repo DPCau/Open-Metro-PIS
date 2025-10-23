@@ -484,14 +484,14 @@ function computeRailAndConnectors() {
                 const localNextIndex = stations.findIndex(station => 
                     station.querySelector('.station-circle').classList.contains('next')
                 );
-                // 已走过标记：方向敏感，正向标记下一站之前，反向标记下一站之后
+                // 已走过标记：方向不依赖视觉反排，统一按“下一站之前”为已走过
                 const isReverseRow = row.classList.contains('reverse');
                 stations.forEach((station, idx) => {
                     const globalIdx = rowStart + idx;
                     const circle = station.querySelector('.station-circle');
                     const isActive = !hasActiveRange ? true : (globalIdx >= activeStart && globalIdx <= activeEnd);
                     if (isActive && localNextIndex >= 0) {
-                        const isPassed = isReverseRow ? (idx > localNextIndex) : (idx < localNextIndex);
+                        const isPassed = idx < localNextIndex; // 修正：反转行也按索引小于下一站为已走过
                         if (isPassed) {
                             circle.classList.add('passed');
                         }
@@ -505,11 +505,12 @@ function computeRailAndConnectors() {
                         const rowActiveStart = Math.max(rowStart, activeStart);
                         const rowActiveEnd = Math.min(rowEnd, activeEnd);
                         if (rowActiveStart <= rowActiveEnd) {
-                            endIndexForColor = row.classList.contains('reverse') ? (rowActiveStart - rowStart) : (rowActiveEnd - rowStart);
+                            // 修正：未走过段应从下一站延伸到行的“末端”（活动区间内的较大索引），与视觉反排无关
+                            endIndexForColor = (rowActiveEnd - rowStart);
                         }
                     }
                     if (endIndexForColor === undefined) {
-                        // 反向行应向视觉左端着色，使用最后一个站点作为端点
+                        // 未走过段（无活动区间）统一延伸到行末端（较大索引）
                         endIndexForColor = stations.length - 1;
                     }
                     const endRect = stations[endIndexForColor].getBoundingClientRect();

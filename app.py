@@ -29,9 +29,9 @@ except Exception as e:
 
 # 模拟当前状态数据
 current_state = {
-    'line_name': 'line_17',
+    'line_name': 'line_7',
     'route_name': 'route1',
-    'next_station': '二仙桥',
+    'next_station': '槐树店',
     'direction': 1, # 方向：0与数据文件顺序一致，1为反向（显示反转）
     'door_side': '本侧',  # 本侧或对侧
     'current_time': '22:19',
