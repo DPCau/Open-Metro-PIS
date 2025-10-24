@@ -29,9 +29,9 @@ except Exception as e:
 
 # 模拟当前状态数据
 current_state = {
-    'line_name': 'line_7',
+    'line_name': 'line_S3',
     'route_name': 'route1',
-    'next_station': '火车南站',
+    'next_station': '福田',
     'direction': 0, # 方向：0与数据文件顺序一致，1为反向（显示反转）
     'door_side': '本侧',  # 本侧或对侧
     'current_time': '22:19',
@@ -680,9 +680,15 @@ def station_detail():
                 current_code = tools._line_code_from_key(line_name)
                 for code in next_station_info.get('transfer_lines', []):
                     if code != current_code:
-                        key = f"line_{int(code)}"
+                        code_str = str(code).strip()
+                        if code_str.isdigit():
+                            key = f"line_{int(code_str)}"
+                            code_disp = str(int(code_str))
+                        else:
+                            key = f"line_{code_str}"
+                            code_disp = code_str
                         transfer_lines_display.append(tools.get_line_display_name(key))
-                        transfer_badges.append({'code': str(int(code)), 'color': tools.get_line_color(key)})
+                        transfer_badges.append({'code': code_disp, 'color': tools.get_line_color(key)})
             except Exception:
                 pass
         elif next_station_info:
@@ -690,9 +696,15 @@ def station_detail():
                 current_code = _line_code_from_key(line_name)
                 for code in next_station_info.get('transfer_lines', []):
                     if code != current_code:
-                        key = f"line_{int(code)}"
+                        code_str = str(code).strip()
+                        if code_str.isdigit():
+                            key = f"line_{int(code_str)}"
+                            code_disp = str(int(code_str))
+                        else:
+                            key = f"line_{code_str}"
+                            code_disp = code_str
                         transfer_lines_display.append(fallback_get_line_display_name(key))
-                        transfer_badges.append({'code': str(int(code)), 'color': fallback_get_line_color(key)})
+                        transfer_badges.append({'code': code_disp, 'color': fallback_get_line_color(key)})
             except Exception:
                 pass
         
@@ -773,9 +785,15 @@ def arrival():
                 current_code = tools._line_code_from_key(line_name)
                 for code in next_station_info.get('transfer_lines', []):
                     if code != current_code:
-                        key = f"line_{int(code)}"
+                        code_str = str(code).strip()
+                        if code_str.isdigit():
+                            key = f"line_{int(code_str)}"
+                            code_disp = str(int(code_str))
+                        else:
+                            key = f"line_{code_str}"
+                            code_disp = code_str
                         transfer_lines_display.append(tools.get_line_display_name(key))
-                        transfer_badges.append({'code': str(int(code)), 'color': tools.get_line_color(key)})
+                        transfer_badges.append({'code': code_disp, 'color': tools.get_line_color(key)})
             except Exception:
                 pass
         
@@ -989,9 +1007,14 @@ def _get_trans_data():
 
 def _line_code_from_key(line_key):
     try:
-        return int(line_key.split('_')[1])
+        part = line_key.split('_')[1]
     except Exception:
         return None
+    s = str(part).strip()
+    if s.isdigit():
+        return str(int(s))
+    else:
+        return s
 
 def fallback_get_line_display_name(line_key):
     route_data = _get_route_data()
@@ -1056,24 +1079,44 @@ def fallback_get_line_map_info(line_key, route_name):
         if isinstance(info, list) and line_code is not None:
             indices = []
             transfer_lines = []
+            # 统一处理站点所在线路代码，支持数字与字母数字（如 S3）
+            codes_all = []
             for rec in info:
-                try:
-                    code = int(rec[0])
-                except Exception:
-                    try:
-                        code = int(str(rec[0]).lstrip('0'))
-                    except Exception:
-                        code = None
+                raw_code = rec[0]
+                code_str = str(raw_code).strip()
+                # 规范化：数字去掉前导0，其它保持原样（例如 S3）
+                if code_str.isdigit():
+                    code_norm = str(int(code_str))
+                else:
+                    code_norm = code_str
                 idx = rec[1] if len(rec) > 1 else None
-                if code is not None:
-                    indices.append([code, idx])
-                    if code != line_code:
-                        transfer_lines.append(code)
+                codes_all.append([code_norm, idx])
+            # 当前线路代码统一为字符串，用于比较
+            current_code_norm = str(line_code) if line_code is not None else None
+            # 站点索引保留所有线路的 [code, idx]
+            indices = codes_all
+            # 排除当前线路后的换乘线路
+            transfer_lines = []
+            for c, _ in codes_all:
+                if current_code_norm is None or c != current_code_norm:
+                    transfer_lines.append(c)
+            # 设置基础字段
             entry['station_index'] = indices
-            if transfer_lines:
+            # is_transfer：该站有超过一条线路（包含当前线）即为换乘站
+            unique_all = set([c for c, _ in codes_all])
+            if len(unique_all) > 1:
                 entry['is_transfer'] = True
+            # 设置换乘线路（不含当前线）
+            if transfer_lines:
                 entry['transfer_lines'] = transfer_lines
                 entry['transfer_count_excl_current'] = len(transfer_lines)
+                # 构造徽章颜色
+                badges = []
+                for c in transfer_lines:
+                    line_key = f"line_{c}"
+                    color = fallback_get_line_color(line_key) or '#444444'
+                    badges.append({ 'code': c, 'color': color })
+                entry['transfer_badges'] = badges
         result.append(entry)
     return result
 

@@ -147,12 +147,16 @@ class RouteTools:
         return info.get('line_name', line_key)
     
     def _line_code_from_key(self, line_key):
-        """从'line_5'解析出站点索引里的线路代码'05'"""
+        """从'line_5'或'line_S3'解析出站点索引里的线路代码（数字两位、字母数字原样）"""
         try:
-            num = int(line_key.split('_')[1])
-            return f"{num:02d}"
+            part = line_key.split('_')[1]
         except Exception:
-            return line_key
+            return ''
+        s = str(part).strip()
+        if s.isdigit():
+            return f"{int(s):02d}"
+        else:
+            return s
     
     def get_station_en_name(self, station_name):
         """获取站点英文名，如果不存在，返回原名"""
@@ -201,9 +205,15 @@ class RouteTools:
             for code in transfer_lines:
                 if code == current_code:
                     continue
-                line_key = f"line_{int(code)}"
+                code_str = str(code).strip()
+                if code_str.isdigit():
+                    line_key = f"line_{int(code_str)}"
+                    code_disp = str(int(code_str))
+                else:
+                    line_key = f"line_{code_str}"
+                    code_disp = code_str
                 badges.append({
-                    'code': str(int(code)),
+                    'code': code_disp,
                     'color': self.get_line_color(line_key)
                 })
             enriched.append({
@@ -269,9 +279,10 @@ class RouteTools:
         return color or '#9b5de5'
     
     def get_line_color_by_code(self, code):
-        """根据线路代码'05'返回主题色"""
-        try:
-            key = f"line_{int(code)}"
-            return self.get_line_color(key)
-        except Exception:
-            return '#9b5de5'
+        """根据线路代码返回主题色，支持数字与字母数字（如 S3）"""
+        code_str = str(code).strip()
+        if code_str.isdigit():
+            key = f"line_{int(code_str)}"
+        else:
+            key = f"line_{code_str}"
+        return self.get_line_color(key)
