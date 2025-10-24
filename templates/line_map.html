@@ -664,7 +664,7 @@ function computeRailAndConnectors() {
         );
         const shouldColor = connectorActive && (!isNaN(globalNextIndex) && !isNaN(lowerStartIndex) && globalNextIndex < lowerStartIndex);
         
-        // 避免亚像素缝隙：所有关键坐标取整，并对左侧越界做保护
+        // 避免亚像素缝隙：所有关键坐标取整，并结合左侧越界做保护
         const xUpperR = Math.round(xUpper);
         const xLowerR = Math.round(xLower);
         const yUpperR = Math.round(yUpper);
@@ -987,6 +987,8 @@ function renderLoopMap() {
     const seg = totalLen / nU;
     const anchorOffset = (W - 2 * radius) / 2; // 顶边直线段的中点
     const pts = [];
+    const nodes = [];
+    const dPos = [];
 
     for (let i = 0; i < nU; i++) {
         const stepsFromAnchor = ((i - (anchorPos >= 0 ? anchorPos : 0)) % nU + nU) % nU;
@@ -1076,6 +1078,8 @@ function renderLoopMap() {
         }
         // 静态线路图：不做已过站灰显
         group.appendChild(node);
+        nodes.push(node);
+        dPos.push(d);
     }
 
     // 边段方向箭头：拐角处不显示（derection=0逆时针，derection=1顺时针）
@@ -1123,6 +1127,77 @@ function renderLoopMap() {
     colored.setAttribute('stroke', themeColor);
     colored.setAttribute('stroke-width', '15');
     svg.appendChild(colored);
+
+    // 环线“已走过”规则：根据是否有终点站与方向标记灰段与站点
+    (function applyLoopPassed() {
+        const nextIdxU = orderedUnique.findIndex(s => s.station_name === nextStationName);
+        const hasTerminal = JSON.parse(document.getElementById('loop-has-terminal-data')?.textContent || 'false');
+        const terminalName = JSON.parse(document.getElementById('loop-terminal-station-data')?.textContent || 'null');
+        const terminalIdxU = orderedUnique.findIndex(s => s.station_name === terminalName);
+        if (nextIdxU < 0) return; // 无下一站，跳过
+
+        // 方向：derection=0 按 i+1 前进；derection=1 按 i-1 前进
+        const stepNext = (i) => (derection === 0 ? (i + 1) % nU : (i - 1 + nU) % nU);
+        const stepPrev = (i) => (derection === 0 ? (i - 1 + nU) % nU : (i + 1) % nU);
+
+        // 站点灰显列表
+        let passedIndices = [];
+        let startIdxForArc = -1;
+        if (hasTerminal && terminalIdxU >= 0) {
+            // 有终点站：从终点站到下一站（不含下一站）之间标记为已过
+            let i = terminalIdxU;
+            startIdxForArc = terminalIdxU;
+            while (i !== nextIdxU) {
+                passedIndices.push(i);
+                i = stepNext(i);
+            }
+        } else {
+            // 无终点站：仅上一站标记为已过，灰线覆盖上一站到下一站之间的段
+            const prevIdxU = stepPrev(nextIdxU);
+            passedIndices.push(prevIdxU);
+            startIdxForArc = prevIdxU;
+        }
+
+        // 标记站点为已过（灰、静止）
+        passedIndices.forEach(i => {
+            const circle = nodes[i]?.querySelector('.station-circle');
+            if (circle) circle.classList.add('passed');
+        });
+
+        // 绘制灰色已过线段：从起点到下一站的路径段（按路径增长方向从 endD 到 startD）
+        if (startIdxForArc >= 0 && startIdxForArc !== nextIdxU) {
+            const startD = dPos[startIdxForArc];
+            const endD = dPos[nextIdxU];
+            let L, startArcPos;
+            if (derection === 0) {
+                // 逆时针：沿站序 i+1 前进，d 随前进减小；灰段应从 endD 起，长度为 startD->endD 的差值
+                L = (startD - endD + totalLen) % totalLen;
+                startArcPos = endD;
+            } else {
+                // 顺时针：沿站序 i-1 前进，d 随前进增大；灰段应从 startD 起，长度为 startD->endD 的差值
+                L = (endD - startD + totalLen) % totalLen;
+                startArcPos = startD;
+            }
+            if (L > 0) {
+                 const passedStroke = document.createElementNS(ns, 'rect');
+                 passedStroke.setAttribute('x', String(margin));
+                 passedStroke.setAttribute('y', String(margin));
+                 passedStroke.setAttribute('width', String(W));
+                 passedStroke.setAttribute('height', String(H));
+                 passedStroke.setAttribute('rx', String(radius));
+                 passedStroke.setAttribute('ry', String(radius));
+                 passedStroke.setAttribute('fill', 'none');
+                 passedStroke.setAttribute('stroke', '#cfcfcf');
+                 passedStroke.setAttribute('stroke-width', '15');
+                 passedStroke.setAttribute('stroke-linecap', 'butt');
+                 // 单段灰：灰段长度 L，剩余为透明（总长 - L）
+                 passedStroke.setAttribute('stroke-dasharray', `${L} ${totalLen - L}`);
+                 // 从正确的起点开始绘制（随方向）
+                 passedStroke.setAttribute('stroke-dashoffset', String((totalLen - startArcPos) % totalLen));
+                 svg.appendChild(passedStroke);
+             }
+        }
+    })();
 
     // 补充换乘徽章颜色与旋转环（保留）
     setTransferBadgeColors();
