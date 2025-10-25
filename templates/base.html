@@ -3,8 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>成都地铁PIS系统 - {% block title %}{% endblock %}</title>
+    <title>{{ config.app_name }}{{ config.title_separator }}{% block title %}{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        @font-face {
+            font-family: 'Digital';
+            src: url('/static/font/font.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        
+        :root {
+            --theme-color: #9b5de5;
+        }
+        
+        .header {
+            background-color: var(--theme-color) !important;
+        }
+    </style>
     <script src="{{ url_for('static', filename='js/common.js') }}"></script>
     {% block head %}{% endblock %}
 </head>
@@ -18,7 +34,7 @@
             <h1 class="title">{% block page_title %}{% endblock %}</h1>
         </div>
         <div class="header-right">
-            <span class="time">{% if current_time %}{{ current_time }}{% else %}{{ "22:19" }}{% endif %}</span>
+            <span class="time" id="current-time">error:time</span>
             {% if door_side %}<span class="door-info">{% if door_side == '本侧' %}本侧开门{% else %}对侧开门{% endif %}</span>{% endif %}
         </div>
     </header>
@@ -27,12 +43,33 @@
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="footer">
+    <!-- <footer class="footer">
         <div class="footer-info">
             <p>成都地铁PIS系统 &copy; 2024</p>
         </div>
-    </footer>
+    </footer> -->
 
     {% block scripts %}{% endblock %}
+    <script>
+        // 实时更新时间显示
+        function updateTime() {
+            const now = new Date();
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            const timeString = `${hours}:${minutes}`;
+            
+            const timeElement = document.getElementById('current-time');
+            if (timeElement) {
+                timeElement.textContent = timeString;
+            }
+        }
+        
+        // 页面加载时立即更新时间
+        document.addEventListener('DOMContentLoaded', function() {
+            updateTime();
+            // 每分钟更新一次时间
+            setInterval(updateTime, 60000);
+        });
+    </script>
 </body>
 </html>

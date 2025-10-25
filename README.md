@@ -20,7 +20,7 @@
 │   └── images/            # 图片资源
 ├── templates/             # HTML模板
 │   ├── base.html          # 基础模板
-│   ├── next_station.html  # 下一站信息页面
+│   ├── index.html         # 首页/下一站信息页面
 │   ├── line_map.html      # 线路图页面
 │   ├── station_detail.html # 站点详情页面
 │   └── arrival.html       # 到站信息页面

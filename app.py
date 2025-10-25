@@ -18,6 +18,36 @@ app = Flask(__name__)
 # 配置项
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 
+# 加载应用配置
+def load_app_config():
+    """加载应用配置文件"""
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config', 'config.json')
+    default_config = {
+        'app_name': 'PIS系统',
+        'copyright_year': '2025',
+        'company_name': '开源PIS',
+        'title_separator': ' - '
+    }
+    
+    try:
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                config_data = json.load(f)
+                # 合并配置，确保所有必需字段都存在
+                for key, value in default_config.items():
+                    if key not in config_data:
+                        config_data[key] = value
+                return config_data
+        else:
+            print(f"警告: 配置文件 {config_path} 不存在，使用默认配置")
+            return default_config
+    except Exception as e:
+        print(f"警告: 加载配置文件失败: {e}，使用默认配置")
+        return default_config
+
+# 全局应用配置
+app_config = load_app_config()
+
 # 初始化RouteTools
 tools = None
 try:
@@ -29,12 +59,11 @@ except Exception as e:
 
 # 模拟当前状态数据
 current_state = {
-    'line_name': 'line_S3',
-    'route_name': 'route1',
-    'next_station': '福田',
-    'direction': 0, # 方向：0与数据文件顺序一致，1为反向（显示反转）
+    'line_name': 'line_7',
+    'route_name': 'route2',
+    'next_station': '火车南站',
+    'direction': 1, # 方向：0与数据文件顺序一致，1为反向（显示反转）
     'door_side': '本侧',  # 本侧或对侧
-    'current_time': '22:19',
     'current_carriage': 3
 }
 
@@ -280,196 +309,29 @@ def index():
     except Exception:
         pass
 
-    return render_template('next_station.html',
+    # 获取翻译数据
+    trans_data = _get_trans_data()
+    
+    return render_template('index.html',
                            line_color=line_color,
                            terminal_station=terminal_station,
                            start_station=start_station,
                            route_services=route_services,
                            loop_ring_label_main=loop_ring_label_main,
                            loop_terminal_main=loop_terminal_main,
+                           trans_data=trans_data,
+                           config=app_config,
                            **current_state)
 
-@app.route('/next_station')
-def next_station():
-    """下一站信息页面（适配direction与终点展示）"""
-    # 主题色
-    line_color = None
-    try:
-        if tools is not None:
-            line_color = tools.get_line_color(current_state['line_name'])
-    except Exception:
-        pass
-    if line_color is None:
-        line_color = fallback_get_line_color(current_state['line_name'])
 
-    # 根据direction计算两端站名用于展示（右侧为终点站）
-    terminal_station = None
-    start_station = None
-    try:
-        line_name = current_state['line_name']
-        route_name = current_state['route_name']
-        direction = current_state.get('direction', 0)
-        line_info = None
-        if tools is not None:
-            try:
-                line_info = tools.get_line_map_info(line_name, route_name)
-            except Exception:
-                pass
-        if line_info is None:
-            try:
-                line_info = fallback_get_line_map_info(line_name, route_name)
-            except Exception:
-                pass
-        if line_info:
-            if direction == 1:
-                terminal_station = line_info[0].get('station_name')
-                start_station = line_info[-1].get('station_name')
-            else:
-                terminal_station = line_info[-1].get('station_name')
-                start_station = line_info[0].get('station_name')
-        else:
-            if direction == 0:
-                try:
-                    if tools is not None:
-                        terminal_station = tools.get_terminal_station(line_name, route_name)
-                except Exception:
-                    pass
-                if terminal_station is None:
-                    terminal_station = fallback_get_terminal_station(line_name, route_name)
-                # 起点站回退：取该路线的首站
-                try:
-                    route_data = _get_route_data()
-                    services = route_data.get(line_name, {}).get('services', [])
-                    for s in services:
-                        name = s.get('type') or s.get('service_name')
-                        if name == route_name:
-                            stations = s.get('stations', [])
-                            if stations:
-                                start_station = stations[0]
-                            break
-                except Exception:
-                    pass
-            else:
-                try:
-                    route_data = _get_route_data()
-                    services = route_data.get(line_name, {}).get('services', [])
-                    for s in services:
-                        name = s.get('type') or s.get('service_name')
-                        if name == route_name:
-                            stations = s.get('stations', [])
-                            if stations:
-                                terminal_station = stations[0]
-                                start_station = stations[-1] if len(stations) > 0 else None
-                            break
-                except Exception:
-                    pass
-    except Exception:
-        pass
-
-    # 构建多运营线路数据（与首页一致，direction适配反向）
-    route_services = []
-    try:
-        line_name = current_state['line_name']
-        route_name = current_state['route_name']
-        direction = current_state.get('direction', 0)
-        routes = []
-        if tools is not None:
-            try:
-                routes = tools.get_routes_for_line(line_name)
-            except Exception:
-                routes = []
-        if not routes:
-            try:
-                routes = fallback_get_routes_for_line(line_name)
-            except Exception:
-                routes = []
-        # 主线信息
-        main_count = 0
-        try:
-            if tools is not None:
-                info = tools.get_station_info(line_name, route_name)
-                main_count = len(info)
-            if main_count == 0:
-                info = fallback_get_station_info(line_name, route_name)
-                main_count = len(info)
-        except Exception:
-            main_count = 0
-        # 主线完整站序（适配direction）
-        main_stations = []
-        try:
-            main_info = []
-            if tools is not None:
-                try:
-                    main_info = tools.get_station_info(line_name, route_name)
-                except Exception:
-                    main_info = []
-            if not main_info:
-                main_info = fallback_get_station_info(line_name, route_name)
-            main_stations = [s.get('station_name') for s in main_info]
-            if direction == 1:
-                main_stations = list(reversed(main_stations))
-        except Exception:
-            main_stations = []
-        route_services.append({
-            'name': route_name,
-            'is_main': True,
-            'start': start_station,
-            'end': terminal_station,
-            'count': max(2, min(6, main_count)),
-            'total': main_count,
-            'stations': main_stations
-        })
-        # 其他服务
-        for r in routes:
-            if r == route_name:
-                continue
-            try:
-                other_info = []
-                if tools is not None:
-                    try:
-                        other_info = tools.get_station_info(line_name, r)
-                    except Exception:
-                        other_info = []
-                if not other_info:
-                    other_info = fallback_get_station_info(line_name, r)
-                other_names = [s.get('station_name') for s in other_info]
-                if direction == 1:
-                    other_names = list(reversed(other_names))
-                start_other = other_names[0] if len(other_names) > 0 else ''
-                end_other = other_names[-1] if len(other_names) > 0 else ''
-                route_services.append({
-                    'name': r,
-                    'is_main': False,
-                    'start': start_other,
-                    'end': end_other,
-                    'count': max(2, min(6, len(other_names))),
-                    'total': len(other_names),
-                    'stations': other_names
-                })
-            except Exception:
-                # 忽略单个服务错误，继续
-                pass
-    except Exception:
-        route_services = []
-
-    # 按route后的数字排序（稳定排序，不改变非数字名的相对顺序）
-    def _route_num(n):
-        try:
-            if isinstance(n, str) and n.startswith('route'):
-                digits = ''.join([c for c in n[5:] if c.isdigit()])
-                if digits:
-                    return int(digits)
-        except Exception:
-            pass
-        return 10**9
-    route_services.sort(key=lambda s: _route_num(s.get('name', '')))
-
-    return render_template('next_station.html', line_color=line_color, terminal_station=terminal_station, start_station=start_station, route_services=route_services, **current_state)
 
 @app.route('/line_map')
 def line_map():
     """线路图页面（基于真实数据渲染）"""
     try:
+        # 获取翻译数据
+        trans_data = _get_trans_data()
+        
         line_name = current_state['line_name']
         route_name = current_state['route_name']
         
@@ -623,6 +485,8 @@ def line_map():
                                 loop_terminal_station=loop_terminal_station,
                                 current_route_stations=current_route_stations,
                                 full_route_mode=full_route_mode,
+                                trans_data=trans_data,
+                                config=app_config,
                                 **current_state)
     except Exception as e:
         error_msg = f"获取线路信息失败: {str(e)}"
@@ -714,6 +578,7 @@ def station_detail():
                               transfer_lines_display=transfer_lines_display,
                               transfer_badges=transfer_badges,
                               line_color=line_color,
+                              config=app_config,
                               **current_state)
     except Exception as e:
         error_msg = f"获取站点信息失败: {str(e)}"
@@ -805,6 +670,7 @@ def arrival():
                               transfer_lines_display=transfer_lines_display,
                               transfer_badges=transfer_badges,
                               line_color=line_color,
+                              config=app_config,
                               **current_state)
     except Exception as e:
         error_msg = f"获取到站信息失败: {str(e)}"

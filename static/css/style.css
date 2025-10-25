@@ -60,8 +60,12 @@ body {
 }
 
 .time {
-    font-size: 16px;
+    font-size: 28px;
     font-weight: bold;
+    font-family: 'Digital', monospace;
+    letter-spacing: 2px;
+    color: #fff;
+    text-shadow: 0 0 2px rgba(255, 255, 255, 0.5);
 }
 
 .door-info {

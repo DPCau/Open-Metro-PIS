@@ -2,11 +2,45 @@
 
 {% block title %}线路图{% endblock %}
 
+{% block page_title %}
+    <div class="next-station-title">
+        <span class="next-station-label">下一站</span>
+        <span class="next-station-name">{{ next_station }}</span>
+        <span class="next-station-name-en">{{ trans_data.get(next_station, next_station).replace('<br>', ' ') }}</span>
+    </div>
+{% endblock %}
+
 {% block head %}
 <style>
+    .next-station-title {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+    }
+    
+    .next-station-label {
+        font-size: 18px;
+        color: #fff;
+        opacity: 0.9;
+    }
+    
+    .next-station-name {
+        font-size: 32px;
+        font-weight: bold;
+        color: #fff;
+    }
+    
+    .next-station-name-en {
+        font-size: 16px;
+        color: #fff;
+        opacity: 0.8;
+    }
+    
     .line-map-container {
         width: 100%;
         padding: 20px 0;
+        min-height: 75vh; /* 增加画布高度：可根据需要调整比例 */
         overflow: hidden; /* 保证内容不超出白色画布 */
     }
     
@@ -199,7 +233,7 @@
         background-color: transparent;
         color: var(--theme-color);
         box-shadow: none;
-        border: 3px solid var(--theme-color);
+        border: 4px solid var(--theme-color);
     }
     /* 非当前子路线的换乘站：环不旋转，边框改为中性灰，保持空心圆展示等分环 */
     .station-circle.transfer.inactive {
@@ -302,9 +336,6 @@
 
 <div class="navigation-buttons" style="margin-top: 30px; display: flex; justify-content: center; gap: 20px;">
     <button class="btn" onclick="navigateTo('/')">返回首页</button>
-    <button class="btn" onclick="navigateTo('/next_station')">下一站信息</button>
-    <button class="btn" onclick="navigateTo('/station_detail')">站点详情</button>
-    <button class="btn" onclick="navigateTo('/arrival')">到站信息</button>
 </div>
 {% endblock %}
 
@@ -1148,7 +1179,9 @@ function renderLoopMap() {
             let i = terminalIdxU;
             startIdxForArc = terminalIdxU;
             while (i !== nextIdxU) {
-                passedIndices.push(i);
+                if (i !== terminalIdxU) {
+                    passedIndices.push(i);
+                }
                 i = stepNext(i);
             }
         } else {
