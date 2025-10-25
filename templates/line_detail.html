@@ -7,18 +7,35 @@
     {% set ring_label = '内环运行' if direction|int == 1 else '外环运行' %}
     {% if loop_has_terminal and loop_terminal_station %}
         {{ ring_label }} 终点站：<strong>{{ loop_terminal_station }}</strong>
+        <div class="line-sub-info-en">{% if direction|int == 1 %}Inner Loop{% else %}Outer Loop{% endif %} Terminal: <strong>{{ trans_data.get(loop_terminal_station, loop_terminal_station).replace('<br>', ' ') }}</strong></div>
     {% else %}
         <strong>{{ ring_label }}</strong>
+        <div class="line-sub-info-en">{% if direction|int == 1 %}Inner Loop{% else %}Outer Loop{% endif %}</div>
     {% endif %}
 {% else %}
     {% set terminal_station_for_dir = (line_info[-1].station_name if line_info and line_info|length > 0 else '') %}
     终点站：<strong>{{ terminal_station_for_dir }}</strong>
+    <div class="line-sub-info-en">Terminal: <strong>{{ trans_data.get(terminal_station_for_dir, terminal_station_for_dir).replace('<br>', ' ') }}</strong></div>
 {% endif %}
 {% endblock %}
 
 {% block page_title %}
     <div class="next-station-title">
-        <span class="next-station-label">下一站</span>
+        <div class="next-topline">
+            <span class="next-station-label">下一站</span>
+            <span class="next-station-label" style="font-size: 12px;">Next Station</span>
+            {% if transfer_badges and transfer_badges|length > 0 %}
+            <div class="next-station-transfers">
+                <span class="transfer-label">换乘</span>
+                <span class="transfer-label" style="font-size: 13px;">Transfer</span>
+                <span class="next-transfer-badges">
+                    {% for b in transfer_badges %}
+                    <span class="transfer-badge" data-color="{{ b.color }}">{{ b.code }}</span>
+                    {% endfor %}
+                </span>
+            </div>
+            {% endif %}
+        </div>
         <span class="next-station-name">{{ next_station }}</span>
         <span class="next-station-name-en">{{ trans_data.get(next_station, next_station).replace('<br>', ' ') }}</span>
     </div>
@@ -32,11 +49,13 @@
         align-items: center;
         gap: 5px;
     }
+    .next-topline { display: inline-flex; align-items: center; gap: 10px; }
     .next-station-label {
         font-size: 18px;
         color: #fff;
         opacity: 0.9;
     }
+    .transfer-label { font-size: 18px; color: #fff; opacity: 0.9; font-weight: normal; }
     .next-station-name {
         font-size: 32px;
         font-weight: bold;
@@ -47,6 +66,17 @@
         color: #fff;
         opacity: 0.8;
     }
+    .next-station-transfers {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: #fff;
+        opacity: 0.9;
+        margin-top: 0; /* 与“下一站”同行显示，不用上边距 */
+    }
+    .next-transfer-badges { display: inline-flex; gap: 6px; }
+    /* 复用 .transfer-badge 尺寸与圆形样式 */
+    .transfer-badge { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: bold; }
     .local-line-container {
         width: 100%;
         padding: 20px 0;

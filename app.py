@@ -61,7 +61,7 @@ except Exception as e:
 current_state = {
     'line_name': 'line_7',
     'route_name': 'route2',
-    'next_station': '文化宫',
+    'next_station': '太平园',
     'direction':0, # 方向：0与数据文件顺序一致，1为反向（显示反转）
     'door_side': '本侧',  # 本侧或对侧
     'current_carriage': 3
@@ -475,6 +475,51 @@ def line_map():
             loop_has_terminal = False
             loop_terminal_station = ''
 
+        # 下一站换乘徽章（用于头部显示）
+        next_station_info = None
+        transfer_lines_display = []
+        transfer_badges = []
+        try:
+            next_name = current_state.get('next_station')
+            for s in (line_info or []):
+                if s.get('station_name') == next_name:
+                    next_station_info = s
+                    break
+        except Exception:
+            next_station_info = None
+        if next_station_info and tools is not None:
+            try:
+                current_code = tools._line_code_from_key(line_name)
+                for code in next_station_info.get('transfer_lines', []):
+                    if code != current_code:
+                        code_str = str(code).strip()
+                        if code_str.isdigit():
+                            key = f"line_{int(code_str)}"
+                            code_disp = str(int(code_str))
+                        else:
+                            key = f"line_{code_str}"
+                            code_disp = code_str
+                        transfer_lines_display.append(tools.get_line_display_name(key))
+                        transfer_badges.append({'code': code_disp, 'color': tools.get_line_color(key)})
+            except Exception:
+                pass
+        elif next_station_info:
+            try:
+                current_code = _line_code_from_key(line_name)
+                for code in next_station_info.get('transfer_lines', []):
+                    if code != current_code:
+                        code_str = str(code).strip()
+                        if code_str.isdigit():
+                            key = f"line_{int(code_str)}"
+                            code_disp = str(int(code_str))
+                        else:
+                            key = f"line_{code_str}"
+                            code_disp = code_str
+                        transfer_lines_display.append(fallback_get_line_display_name(key))
+                        transfer_badges.append({'code': code_disp, 'color': fallback_get_line_color(key)})
+            except Exception:
+                pass
+
         return render_template('line_map.html', 
                                 line_info=line_info,
                                 line_display_name=line_display_name,
@@ -486,6 +531,7 @@ def line_map():
                                 current_route_stations=current_route_stations,
                                 full_route_mode=full_route_mode,
                                 trans_data=trans_data,
+                                transfer_badges=transfer_badges,
                                 config=app_config,
                                 **current_state)
     except Exception as e:
@@ -621,7 +667,6 @@ def line_detail():
                         line_info = line_info + [term_obj]
         except Exception:
             pass
-        print(line_info)
         return render_template('line_detail.html',
                               line_info=line_info,
                               current_station_info=current_station_info,
