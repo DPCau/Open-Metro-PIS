@@ -1,0 +1,491 @@
+{% extends "base.html" %}
+
+{% block title %}线路详情 - {{ config.app_name }}{% endblock %}
+
+{% block header_subtitle %}
+{% if is_loop %}
+    {% set ring_label = '内环运行' if direction|int == 1 else '外环运行' %}
+    {% if loop_has_terminal and loop_terminal_station %}
+        {{ ring_label }} 终点站：<strong>{{ loop_terminal_station }}</strong>
+    {% else %}
+        <strong>{{ ring_label }}</strong>
+    {% endif %}
+{% else %}
+    {% set terminal_station_for_dir = (line_info[-1].station_name if line_info and line_info|length > 0 else '') %}
+    终点站：<strong>{{ terminal_station_for_dir }}</strong>
+{% endif %}
+{% endblock %}
+
+{% block page_title %}
+    <div class="next-station-title">
+        <span class="next-station-label">下一站</span>
+        <span class="next-station-name">{{ next_station }}</span>
+        <span class="next-station-name-en">{{ trans_data.get(next_station, next_station).replace('<br>', ' ') }}</span>
+    </div>
+{% endblock %}
+
+{% block head %}
+<style>
+    .next-station-title {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 5px;
+    }
+    .next-station-label {
+        font-size: 18px;
+        color: #fff;
+        opacity: 0.9;
+    }
+    .next-station-name {
+        font-size: 32px;
+        font-weight: bold;
+        color: #fff;
+    }
+    .next-station-name-en {
+        font-size: 16px;
+        color: #fff;
+        opacity: 0.8;
+    }
+    .local-line-container {
+        width: 100%;
+        padding: 20px 0;
+        min-height: 40vh;
+        overflow: hidden;
+    }
+    .local-line {
+        position: relative;
+        width: 100%;
+        --theme-color: {{ line_color or '#9b5de5' }};
+    }
+    .local-line-row {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: space-between; /* 两端对齐 */
+        gap: 0; /* 两端对齐时不用gap */
+        padding: 40px 60px; /* 给左右留边距 */
+    }
+    .station-node {
+        position: relative;
+        width: 140px;
+        height: 96px;
+        flex: 0 0 auto;
+        z-index: 2; /* 确保站点层级在连接线之上 */
+    }
+    .station-circle {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 14px;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background-color: #fff;
+        border: 4px solid var(--theme-color);
+        color: #fff;
+        box-shadow: 0 0 0 3px #fff inset;
+    }
+    .station-circle.next::before {
+        content: '';
+        width: 12px;
+        height: 12px;
+        background: #ff3b30;
+        border-radius: 50%;
+        animation: blink 1s infinite alternate;
+    }
+    @keyframes blink {
+        from { opacity: 0.3; }
+        to { opacity: 1; }
+    }
+    .station-circle.passed {
+        background-color: #cfcfcf;
+        border-color: #cfcfcf;
+        box-shadow: 0 0 0 3px #cfcfcf inset;
+    }
+    .station-circle.transfer {
+        background-color: transparent;
+        color: var(--theme-color);
+        box-shadow: none;
+        border: 5px solid var(--theme-color);
+    }
+    .station-circle.transfer::before {
+        content: '';
+        position: absolute;
+        inset: 8px;
+        border-radius: 50%;
+        background: #fff;
+        z-index: 1;
+    }
+    .station-labels {
+        position: absolute;
+        top: calc(50% + 34px);
+        left: 50%;
+        transform: translateX(-50%);
+        text-align: center;
+        width: 160px;
+    }
+    .station-name {
+        font-size: 12px;
+        color: #333;
+        text-align: center;
+        line-height: 1.2;
+    }
+    /* 下一站名称高亮（中英文） */
+    .station-circle.next ~ .station-labels .station-name,
+    .station-name.current {
+        color: #ff4757;
+        font-weight: bold;
+    }
+    .station-name.en {
+        font-size: 10px;
+        color: #666;
+        margin-top: 2px;
+    }
+    /* 已过站：将中文与英文站名统一置灰 */
+    .station-circle.passed ~ .station-labels .station-name,
+    .station-circle.passed ~ .station-labels .station-name.en {
+        color: #999999;
+        font-weight: normal;
+    }
+    .transfer-badges {
+        position: absolute;
+        top: calc(50% - 45px);
+        left: 50%;
+        transform: translateX(-50%);
+        display: inline-flex;
+        gap: 6px;
+        z-index: 3;
+    }
+    .transfer-badge {
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 12px;
+        font-weight: bold;
+    }
+    .connector {
+        position: absolute;
+        height: 12px;
+        background-color: var(--theme-color);
+        border-radius: 6px;
+        z-index: 0; /* 下调到站点之下 */
+    }
+    .connector.faded-left {
+        background: linear-gradient(to left, var(--theme-color), rgba(0,0,0,0));
+        opacity: 0.9;
+    }
+    .connector.faded-right {
+        background: linear-gradient(to right, var(--theme-color), rgba(0,0,0,0));
+        opacity: 0.9;
+    }
+    /* 旋转彩环动画（用于换乘站） */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* 方向箭头变量与样式（与 line_map 保持一致） */
+    :root {
+        --arrow-size: 24px;
+        --arrow-weight: 900;
+        --arrow-color-black: #000;
+        --arrow-color-gray: #555;
+        --arrow-color-red: #ff3b30;
+        --arrow-blink-duration: 1s;
+    }
+    .direction-arrow {
+        position: absolute;
+        font-weight: var(--arrow-weight, 900);
+        font-size: var(--arrow-size, 24px);
+        line-height: 1;
+        z-index: 1;
+        pointer-events: none;
+    }
+    .direction-arrow.black { color: var(--arrow-color-black, #000); }
+    .direction-arrow.gray { color: var(--arrow-color-gray, #555); }
+    .direction-arrow.red { color: var(--arrow-color-red, #ff3b30); animation: blink var(--arrow-blink-duration, 1s) infinite alternate; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="local-line-container">
+        <div class="local-line" id="local-line" style="--theme-color: {{ line_color or '#9b5de5' }};">
+            <div class="local-line-row" id="local-line-row">
+                <!-- 站点将由JS动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <div class="navigation-buttons" style="margin-top: 20px; display: flex; justify-content: center; gap: 20px;">
+        <button class="btn" onclick="navigateTo('/')">返回首页</button>
+        <button class="btn" onclick="navigateTo('/line_map')">查看线路图</button>
+    </div>
+</div>
+
+<!-- 数据注入 -->
+<script id="line-info-data" type="application/json">{{ line_info | tojson }}</script>
+<script id="next-station-data" type="application/json">{{ next_station | tojson }}</script>
+<script id="direction-data" type="application/json">{{ direction | tojson }}</script>
+<script id="is-loop-data" type="application/json">{{ is_loop | tojson }}</script>
+<script id="loop-has-terminal-data" type="application/json">{{ loop_has_terminal | tojson }}</script>
+<script id="loop-terminal-data" type="application/json">{{ loop_terminal_station | tojson }}</script>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function setTransferBadgeColors() {
+    document.querySelectorAll('.transfer-badge[data-color]').forEach(el => {
+        const c = el.getAttribute('data-color');
+        if (c) el.style.backgroundColor = c;
+    });
+}
+
+function createStationNode(station, isNext = false, isPassed = false) {
+    const isTransfer = !!station.is_transfer || (Array.isArray(station.transfer_badges) && station.transfer_badges.length > 0);
+    const node = document.createElement('div');
+    node.className = 'station-node';
+    node.innerHTML = `
+        <div class="station-circle ${isNext ? 'next' : ''} ${isTransfer ? 'transfer' : ''} ${isPassed ? 'passed' : ''}"></div>
+        ${station.transfer_badges && station.transfer_badges.length > 0 ? `
+            <div class="transfer-badges">
+                ${station.transfer_badges.map(b => `
+                    <div class="transfer-badge" data-color="${b.color}">${b.code}</div>
+                `).join('')}
+            </div>
+        ` : ''}
+        <div class="station-labels">
+            <div class="station-name ${isNext ? 'current' : ''}">${station.station_name}</div>
+            <div class="station-name en">${station.station_en_name || station.station_name_en || ''}</div>
+        </div>
+    `;
+    return node;
+}
+
+// 为换乘站创建旋转多色环（复用 line_map 逻辑）
+function createTransferRings() {
+    document.querySelectorAll('.station-node').forEach(node => {
+        const circle = node.querySelector('.station-circle.transfer');
+        if (!circle) return;
+        const themeColor = getComputedStyle(document.querySelector('.local-line')).getPropertyValue('--theme-color').trim() || '#9b5de5';
+        const badgeEls = node.querySelectorAll('.transfer-badge[data-color]');
+        const colors = [themeColor];
+        badgeEls.forEach(b => { const c = b.getAttribute('data-color'); if (c) colors.push(c); });
+        const share = 100 / colors.length;
+        start = 0;
+        const parts = colors.map((clr) => { const end = start + share; const seg = `${clr} ${start}% ${end}%`; start = end; return seg; });
+        const ring = document.createElement('span');
+        ring.style.position = 'absolute';
+        ring.style.inset = '-2px';
+        ring.style.borderRadius = '50%';
+        ring.style.background = `conic-gradient(${parts.join(', ')})`;
+        ring.style.zIndex = '0';
+        if (!circle.classList.contains('passed')) {
+            ring.style.animation = 'spin 4s linear infinite';
+        }
+        circle.appendChild(ring);
+    });
+}
+
+function renderConnectorsAndArrows(nodes, themeColor) {
+    const row = document.getElementById('local-line-row');
+    if (!row || !Array.isArray(nodes) || nodes.length === 0) return;
+    // 清理旧的连线与箭头
+    document.querySelectorAll('.connector').forEach(el => el.remove());
+    document.querySelectorAll('.direction-arrow').forEach(el => el.remove());
+    const rowRect = row.getBoundingClientRect();
+    const y = rowRect.height / 2;
+    function centerX(node) { const r = node.getBoundingClientRect(); return r.left + r.width / 2; }
+    function addConnector(x1, x2, cls) {
+        const c = document.createElement('div');
+        c.className = 'connector' + (cls ? ' ' + cls : '');
+        const left = Math.min(x1, x2);
+        const width = Math.abs(x2 - x1);
+        c.style.left = (left - rowRect.left) + 'px';
+        c.style.top = y + 'px';
+        c.style.transform = 'translateY(-50%)';
+        c.style.width = width + 'px';
+        c.style.backgroundColor = themeColor;
+        row.appendChild(c);
+    }
+    for (let k = 0; k < nodes.length - 1; k++) {
+        const x1 = centerX(nodes[k]);
+        const x2 = centerX(nodes[k+1]);
+        addConnector(x1, x2);
+        const circleA = nodes[k].querySelector('.station-circle');
+        const circleB = nodes[k+1].querySelector('.station-circle');
+        const aPassed = circleA && circleA.classList.contains('passed');
+        const bPassed = circleB && circleB.classList.contains('passed');
+        const bIsNext = circleB && circleB.classList.contains('next');
+        let colorClass = 'black';
+        if (aPassed && bPassed) colorClass = 'gray';
+        if (bIsNext) colorClass = 'red';
+        const arrow = document.createElement('div');
+        arrow.className = 'direction-arrow ' + colorClass;
+        arrow.textContent = '→';
+        const midX = (x1 + x2) / 2;
+        arrow.style.left = (midX - rowRect.left) + 'px';
+        arrow.style.top = y + 'px';
+        arrow.style.transform = 'translate(-50%, -50%)';
+        row.appendChild(arrow);
+    }
+}
+
+function renderEndFades(nodes, showLeftFade, showRightFade) {
+    const row = document.getElementById('local-line-row');
+    if (!row || !Array.isArray(nodes) || nodes.length === 0) return;
+    const rowRect = row.getBoundingClientRect();
+    const y = rowRect.height / 2;
+    function centerX(node) { const r = node.getBoundingClientRect(); return r.left + r.width / 2; }
+    const fadeLen = 100;
+    if (nodes.length) {
+        const xLeft = centerX(nodes[0]);
+        const xRight = centerX(nodes[nodes.length - 1]);
+        if (showLeftFade) {
+            const c = document.createElement('div');
+            c.className = 'connector faded-left';
+            c.style.left = (xLeft - fadeLen - rowRect.left) + 'px';
+            c.style.top = y + 'px';
+            c.style.transform = 'translateY(-50%)';
+            c.style.width = (fadeLen - 4) + 'px';
+            row.appendChild(c);
+        }
+        if (showRightFade) {
+            const c = document.createElement('div');
+            c.className = 'connector faded-right';
+            c.style.left = (xRight + 4 - rowRect.left) + 'px';
+            c.style.top = y + 'px';
+            c.style.transform = 'translateY(-50%)';
+            c.style.width = (fadeLen - 4) + 'px';
+            row.appendChild(c);
+        }
+    }
+}
+
+function layoutLocalRow() {
+    const lineInfo = JSON.parse(document.getElementById('line-info-data')?.textContent || 'null');
+    const nextStationName = JSON.parse(document.getElementById('next-station-data')?.textContent || 'null');
+    const direction = JSON.parse(document.getElementById('direction-data')?.textContent || '0');
+    const isLoop = JSON.parse(document.getElementById('is-loop-data')?.textContent || 'false');
+    const loopHasTerminal = JSON.parse(document.getElementById('loop-has-terminal-data')?.textContent || 'false');
+    const loopTerminalStation = JSON.parse(document.getElementById('loop-terminal-data')?.textContent || '""');
+    const row = document.getElementById('local-line-row');
+    const container = document.querySelector('.local-line-container');
+    if (!Array.isArray(lineInfo) || !row || !container || !nextStationName) return;
+
+    // 计算可见数量（至少3），按宽度增加
+    const containerWidth = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
+    const stationBlockWidth = 140; // 节点+标签的估算宽度
+    const padding = 120;           // 左右边距合计（与 .local-line-row 的 padding 对齐）
+    const maxByWidth = Math.max(3, Math.floor((containerWidth - padding) / stationBlockWidth));
+
+    // 找到下一站索引
+    const n = lineInfo.length;
+    let i = lineInfo.findIndex(s => s.station_name === nextStationName);
+    if (i < 0) i = 0;
+
+    // 左侧两站（已过与刚离开）根据方向判断
+    const leftIdxs = [];
+    if (direction === 0 || direction === '0') {
+        if (i - 1 >= 0) leftIdxs.push(i - 1);
+    } else {
+        if (i + 1 <= n - 1) leftIdxs.push(i + 1);
+    }
+
+    const minLeftCount = leftIdxs.length; // 可用的左侧数量（最多1）
+    const baseRightNeed = Math.max(1, 3 - minLeftCount); // 保证至少3个总数
+    const maxRightCapacity = Math.max(baseRightNeed, maxByWidth - minLeftCount);
+
+    const rightIdxs = [];
+    const maxCount = maxRightCapacity;
+    if (direction === 0 || direction === '0') {
+        let idx = i;
+        let looped = false;
+        while (rightIdxs.length < maxCount) {
+            if (!rightIdxs.includes(idx)) rightIdxs.push(idx);
+            const isTerminal = !!(isLoop && loopHasTerminal && loopTerminalStation && (lineInfo[idx]?.station_name === loopTerminalStation));
+            if (isTerminal) break;
+            idx = idx + 1;
+            if (idx >= n) { idx = 0; looped = true; }
+            if (looped && idx === i) break; // 绕一圈返回到起点则停止
+        }
+    } else {
+        let idx = i;
+        let looped = false;
+        while (rightIdxs.length < maxCount) {
+            if (!rightIdxs.includes(idx)) rightIdxs.push(idx);
+            const isTerminal = !!(isLoop && loopHasTerminal && loopTerminalStation && (lineInfo[idx]?.station_name === loopTerminalStation));
+            if (isTerminal) break;
+            idx = idx - 1;
+            if (idx < 0) { idx = n - 1; looped = true; }
+            if (looped && idx === i) break; // 绕一圈返回到起点则停止
+        }
+    }
+
+    // 清空并渲染节点
+    row.innerHTML = '';
+    const nodes = [];
+    leftIdxs.sort((a,b) => a - b);
+    leftIdxs.forEach((idx, pos) => {
+        const st = lineInfo[idx];
+        const isNext = false;
+        const isPassed = true;
+        const node = createStationNode(st, isNext, isPassed);
+        nodes.push(node);
+        row.appendChild(node);
+    });
+    rightIdxs.forEach((idx, k) => {
+        const st = lineInfo[idx];
+        const isNext = (idx === i);
+        const isPassed = false;
+        const node = createStationNode(st, isNext, isPassed);
+        nodes.push(node);
+        row.appendChild(node);
+    });
+
+    // 补齐换乘徽章配色与旋转环
+    setTransferBadgeColors();
+    createTransferRings();
+
+    // 连接线与箭头渲染
+    const themeColor = getComputedStyle(document.getElementById('local-line')).getPropertyValue('--theme-color') || '#9b5de5';
+    renderConnectorsAndArrows(nodes, themeColor);
+
+    // 两端虚化省略：按方向与已渲染索引判断是否需要
+    let showLeftFade = false;
+    let showRightFade = false;
+    if (direction === 0 || direction === '0') {
+        showLeftFade = leftIdxs.length > 0 && Math.min(...leftIdxs) > 0;
+    } else {
+        showLeftFade = leftIdxs.length > 0 && Math.max(...leftIdxs) < n - 1;
+    }
+
+    const lastRightIdx = rightIdxs.length ? rightIdxs[rightIdxs.length - 1] : null;
+    const lastRightIsTerminal = !!(isLoop && loopHasTerminal && loopTerminalStation && lastRightIdx != null && (lineInfo[lastRightIdx]?.station_name === loopTerminalStation));
+    if (isLoop) {
+        // 环线：当右侧因容量截断且未在终点处停止时，显示右侧渐变
+        showRightFade = (rightIdxs.length === maxRightCapacity) && !lastRightIsTerminal;
+    } else {
+        // 非环线：按边界判断
+        if (direction === 0 || direction === '0') {
+            const lastShown = rightIdxs.length ? Math.max(...rightIdxs) : (leftIdxs.length ? Math.max(...leftIdxs) : i);
+            showRightFade = lastShown < n - 1;
+        } else {
+            const lastShown = rightIdxs.length ? Math.min(...rightIdxs) : (leftIdxs.length ? Math.min(...leftIdxs) : i);
+            showRightFade = lastShown > 0;
+        }
+    }
+    renderEndFades(nodes, showLeftFade, showRightFade);
+}
+
+window.addEventListener('resize', layoutLocalRow);
+window.addEventListener('DOMContentLoaded', layoutLocalRow);
+</script>
+{% endblock %}

@@ -2,6 +2,20 @@
 
 {% block title %}线路图{% endblock %}
 
+{% block header_subtitle %}
+{% if is_loop %}
+    {% set ring_label = '内环运行' if direction|int == 1 else '外环运行' %}
+    {% if loop_has_terminal and loop_terminal_station %}
+        {{ ring_label }} 终点站：<strong>{{ loop_terminal_station }}</strong>
+    {% else %}
+        <strong>{{ ring_label }}</strong>
+    {% endif %}
+{% else %}
+    {% set terminal_station_for_dir = (line_info[-1].station_name if line_info and line_info|length > 0 else '') %}
+    终点站：<strong>{{ terminal_station_for_dir }}</strong>
+{% endif %}
+{% endblock %}
+
 {% block page_title %}
     <div class="next-station-title">
         <span class="next-station-label">下一站</span>
@@ -336,6 +350,7 @@
 
 <div class="navigation-buttons" style="margin-top: 30px; display: flex; justify-content: center; gap: 20px;">
     <button class="btn" onclick="navigateTo('/')">返回首页</button>
+    <button class="btn" onclick="navigateTo('/line_detail')">线路详情</button>
 </div>
 {% endblock %}
 
@@ -897,14 +912,16 @@ function handleResize() {
 function init() {
     if (JSON.parse(document.getElementById('is-loop-data')?.textContent || 'false')) {
         renderLoopMap();
-        scrollToNextStation();
+        // 注释掉自动滚动到下一站，让页面保持在最上方
+        // scrollToNextStation();
         window.addEventListener('resize', handleResize);
     } else {
         createZigzagLayout();
         computeRailAndConnectors();
         setTransferBadgeColors();
         createTransferRings();
-        scrollToNextStation();
+        // 注释掉自动滚动到下一站，让页面保持在最上方
+        // scrollToNextStation();
         // 线性布局首次渲染后做一次延迟复测，修复 direction=1 时初次宽度与位置不稳定导致的左侧挤出
         const metroLine = document.getElementById('metro-line');
         if (metroLine && metroLine.dataset.settle !== 'done') {
@@ -1037,7 +1054,7 @@ function renderLoopMap() {
         const labels = node.querySelector('.station-labels');
         const badges = node.querySelector('.transfer-badges');
         const tol = 20;
-        const labelOffset = 58; // 站名外侧偏移
+        const labelOffset = 58; // 站名外侧与圆的间距
         const badgeOffset = 37; // 换乘徽章距离圆心偏移
         if (labels) {
             const circleR = 15; // 站点圆半径

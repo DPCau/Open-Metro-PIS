@@ -20,6 +20,10 @@
         .header {
             background-color: var(--theme-color) !important;
         }
+        /* 覆盖头部左侧布局：上下一列，首行横排 */
+        .header-left { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+        .header-left-row { display: flex; align-items: center; gap: 15px; }
+        .line-sub-info { display: block; font-size: 14px; color: #ffffffcc; }
     </style>
     <script src="{{ url_for('static', filename='js/common.js') }}"></script>
     {% block head %}{% endblock %}
@@ -27,8 +31,11 @@
 <body>
     <header class="header">
         <div class="header-left">
-            <img src="{{ url_for('static', filename='images/logo.png') }}" alt="成都地铁" class="logo">
-            <span class="line-info">{% if line_name %}{% if line_name == 'line_5' %}5号线{% elif line_name == 'line_1' %}1号线{% elif line_name == 'line_2' %}2号线{% elif line_name == 'line_3' %}3号线{% elif line_name == 'line_4' %}4号线{% elif line_name == 'line_6' %}6号线{% elif line_name == 'line_7' %}7号线{% elif line_name == 'line_8' %}8号线{% elif line_name == 'line_9' %}9号线{% else %}{{ line_name }}{% endif %}{% endif %}</span>
+            <div class="header-left-row">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" class="logo">
+                <span class="line-info">{% if line_name %}{% if line_name.startswith('line_') %}{{ line_name[5:] }}号线{% else %}{{ line_name }}{% endif %}{% endif %}</span>
+            </div>
+            <div class="line-sub-info">{% block header_subtitle %}{% endblock %}</div>
         </div>
         <div class="header-center">
             <h1 class="title">{% block page_title %}{% endblock %}</h1>
@@ -42,12 +49,6 @@
     <main class="content">
         {% block content %}{% endblock %}
     </main>
-
-    <!-- <footer class="footer">
-        <div class="footer-info">
-            <p>成都地铁PIS系统 &copy; 2024</p>
-        </div>
-    </footer> -->
 
     {% block scripts %}{% endblock %}
     <script>

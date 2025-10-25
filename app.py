@@ -61,8 +61,8 @@ except Exception as e:
 current_state = {
     'line_name': 'line_7',
     'route_name': 'route2',
-    'next_station': '火车南站',
-    'direction': 1, # 方向：0与数据文件顺序一致，1为反向（显示反转）
+    'next_station': '文化宫',
+    'direction':0, # 方向：0与数据文件顺序一致，1为反向（显示反转）
     'door_side': '本侧',  # 本侧或对侧
     'current_carriage': 3
 }
@@ -493,9 +493,9 @@ def line_map():
         print(error_msg)
         return error_msg, 500
 
-@app.route('/station_detail')
-def station_detail():
-    """站点详情页面（基于真实数据渲染）"""
+@app.route('/line_detail')
+def line_detail():
+    """线路详情页面（基于真实数据渲染）"""
     try:
         line_name = current_state['line_name']
         route_name = current_state['route_name']
@@ -506,14 +506,14 @@ def station_detail():
             try:
                 line_info = tools.get_line_map_info(line_name, route_name)
             except Exception as e:
-                print(f"从RouteTools获取站点详情数据失败: {e}")
+                print(f"从RouteTools获取线路详情数据失败: {e}")
         
         # 回退到数据文件
         if line_info is None:
             try:
                 line_info = fallback_get_line_map_info(line_name, route_name)
             except Exception as e:
-                print(f"从数据文件获取站点详情失败: {e}")
+                print(f"从数据文件获取线路详情失败: {e}")
         
         # 当前站与下一站
         current_station_info = None
@@ -572,16 +572,71 @@ def station_detail():
             except Exception:
                 pass
         
-        return render_template('station_detail.html',
+        # 线路类型与环线终点（与 line_map 保持一致的字段）
+        is_loop = False
+        loop_has_terminal = False
+        loop_terminal_station = ''
+        try:
+            route_data = _get_route_data()
+            d = route_data.get(line_name, {})
+            is_loop = (d.get('type') == 'loop')
+            services = d.get('services', [])
+            for s in services:
+                name = s.get('type') or s.get('service_name')
+                if name == route_name:
+                    term = (s.get('terminal_station') or '').strip()
+                    loop_has_terminal = bool(term)
+                    loop_terminal_station = term
+                    break
+        except Exception:
+            pass
+        
+        # 翻译数据
+        trans_data = _get_trans_data()
+        
+        # 环线终点站：按运行方向仅在末端追加（direction=0 末尾；direction=1 开头）
+        try:
+            if is_loop and loop_has_terminal and loop_terminal_station and isinstance(line_info, list):
+                # 运行方向：0 正向，1 反向
+                try:
+                    dir_val = int(current_state.get('direction', 0))
+                except Exception:
+                    dir_val = 0
+                # 查找终点对象
+                term_idx = next((i for i, s in enumerate(line_info) if s.get('station_name') == loop_terminal_station), -1)
+                if term_idx >= 0:
+                    term_obj = dict(line_info[term_idx])
+                else:
+                    term_obj = {
+                        'station_name': loop_terminal_station,
+                        'station_name_en': trans_data.get(loop_terminal_station, loop_terminal_station)
+                    }
+                if dir_val == 1:
+                    # 反向运行：若首站不是终点，则在开头追加
+                    if not (len(line_info) > 0 and (line_info[0].get('station_name') == loop_terminal_station)):
+                        line_info = [term_obj] + line_info[:-1]
+                else:
+                    # 正向运行：若末站不是终点，则在结尾追加
+                    if not (len(line_info) > 0 and (line_info[-1].get('station_name') == loop_terminal_station)):
+                        line_info = line_info + [term_obj]
+        except Exception:
+            pass
+        print(line_info)
+        return render_template('line_detail.html',
+                              line_info=line_info,
                               current_station_info=current_station_info,
                               next_station_info=next_station_info,
                               transfer_lines_display=transfer_lines_display,
                               transfer_badges=transfer_badges,
                               line_color=line_color,
+                              is_loop=is_loop,
+                              loop_has_terminal=loop_has_terminal,
+                              loop_terminal_station=loop_terminal_station,
+                              trans_data=trans_data,
                               config=app_config,
                               **current_state)
     except Exception as e:
-        error_msg = f"获取站点信息失败: {str(e)}"
+        error_msg = f"获取线路信息失败: {str(e)}"
         print(error_msg)
         return error_msg, 500
 
