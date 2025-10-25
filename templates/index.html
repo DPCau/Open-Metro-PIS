@@ -84,8 +84,10 @@
         border-radius: 20px;
         z-index: 2;
     }
-    .terminal-station .term-cn { font-size: 16px; font-weight: bold; color: inherit; }
-    .terminal-station .term-en { font-size: 12px; color: #666; }
+    /* 无终点的环线：中英文同一行显示，避免自动换行 */
+    .route-line.single .terminal-station { flex-direction: row; gap: 8px; }
+    .terminal-station .term-cn { font-size: 16px; font-weight: bold; color: inherit; white-space: nowrap; }
+    .terminal-station .term-en { font-size: 12px; color: #666; white-space: nowrap; }
     .route-line.active .terminal-station { background-color: var(--theme-color); color: white; }
     .route-line.active .terminal-station .term-en { color: #fff; opacity: 0.9; }
     
