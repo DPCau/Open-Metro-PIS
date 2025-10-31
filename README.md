@@ -80,11 +80,12 @@
 
 ## 使用方法
 
-0. 字体下载与名称配置:
+0. 字体下载与名称、站台配置:
 
 - 下载字体文件 [font.ttf](https://wwyq.lanzouo.com/inhZH39s00vc)
 - 将字体文件放入`static/fonts/`目录下
 - 依据config.json.example配置名称等参数
+- 在data下配置线路信息，详情见下方
 
 1. 安装依赖：
 ```bash
@@ -98,6 +99,20 @@ python app.py
 
 3. 访问系统：
 在浏览器中访问 http://localhost:8089
+
+4. 在`app.py`下热修改站点信息
+对`app.py`下的`current_state`变量进行修改
+```python
+current_state = {
+    'line_name': 'line_2', # 修改与route的键一致
+    'route_name': 'route2', # 修改与route.service_name一致
+    'next_station': '塔子山公园', # 下一站的名称
+    'direction':0, # 方向：0与数据文件顺序一致，1为反向（显示反转）
+    'door_side': '本侧',  # 本侧或对侧
+    'current_carriage': 3 # 当前车号(暂时没用)
+}
+```
+保存后自动动态加载上面的配置，刷新浏览器生效(若修改不符合语法可能导致程序停止，重新执行步骤2即可)
 
 ## 数据说明
 - **config/config.json**
