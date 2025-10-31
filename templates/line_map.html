@@ -13,7 +13,16 @@
         <div class="line-sub-info-en">{% if direction|int == 1 %}Inner Loop{% else %}Outer Loop{% endif %}</div>
     {% endif %}
 {% else %}
-    {% set terminal_station_for_dir = (line_info[-1].station_name if line_info and line_info|length > 0 else '') %}
+    {% set terminal_station_for_dir = '' %}
+    {% if current_route_stations and current_route_stations|length > 0 %}
+        {% if direction|int == 0 %}
+            {% set terminal_station_for_dir = current_route_stations[-1] %}
+        {% else %}
+            {% set terminal_station_for_dir = current_route_stations[0] %}
+        {% endif %}
+    {% elif line_info and line_info|length > 0 %}
+        {% set terminal_station_for_dir = (line_info[-1].station_name if direction|int == 0 else line_info[0].station_name) %}
+    {% endif %}
     终点站：<strong>{{ terminal_station_for_dir }}</strong>
     <div class="line-sub-info-en">Terminal: <strong>{{ trans_data.get(terminal_station_for_dir, terminal_station_for_dir).replace('<br>', ' ') }}</strong></div>
 {% endif %}

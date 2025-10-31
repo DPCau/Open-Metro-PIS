@@ -32,7 +32,7 @@
     <header class="header">
         <div class="header-left">
             <div class="header-left-row">
-                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" class="logo">
+                <!-- <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo" class="logo"> -->
                 <span class="line-info">{% if line_name %}{% if line_name.startswith('line_') %}{{ line_name[5:] }}号线{% else %}{{ line_name }}{% endif %}{% endif %}<br><p style="font-size: 12px; text-align: center;">Line{% if line_name %}{% if line_name.startswith('line_') %}{{ line_name[5:] }}{% else %}{{ line_name }}{% endif %}{% endif %}</p></span>
             </div>
             <div class="line-sub-info">{% block header_subtitle %}{% endblock %}</div>

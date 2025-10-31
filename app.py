@@ -59,9 +59,9 @@ except Exception as e:
 
 # 模拟当前状态数据
 current_state = {
-    'line_name': 'line_7',
+    'line_name': 'line_2',
     'route_name': 'route2',
-    'next_station': '太平园',
+    'next_station': '塔子山公园',
     'direction':0, # 方向：0与数据文件顺序一致，1为反向（显示反转）
     'door_side': '本侧',  # 本侧或对侧
     'current_carriage': 3
@@ -564,7 +564,9 @@ def line_detail():
         # 当前站与下一站
         current_station_info = None
         next_station_info = None
-        
+        terminal_station = None
+        direction = current_state.get('direction', 0)
+
         if line_info:
             for i, station in enumerate(line_info):
                 if station.get('station_name') == current_state.get('next_station'):
@@ -572,6 +574,7 @@ def line_detail():
                     if i - 1 >= 0:
                         current_station_info = line_info[i - 1]
                     break
+            terminal_station = line_info[-1].get('station_name') if direction == 0 else line_info[0].get('station_name')
         
         # 计算下一站的换乘线路（显示名与徽章），排除当前线路
         transfer_lines_display = []
@@ -677,6 +680,7 @@ def line_detail():
                               is_loop=is_loop,
                               loop_has_terminal=loop_has_terminal,
                               loop_terminal_station=loop_terminal_station,
+                              terminal_station=terminal_station,
                               trans_data=trans_data,
                               config=app_config,
                               **current_state)

@@ -266,6 +266,9 @@
 <script id="is-loop-data" type="application/json">{{ is_loop | tojson }}</script>
 <script id="loop-has-terminal-data" type="application/json">{{ loop_has_terminal | tojson }}</script>
 <script id="loop-terminal-data" type="application/json">{{ loop_terminal_station | tojson }}</script>
+<script id="terminal-data" type="application/json">{{ terminal_station | tojson }}</script>
+
+
 
 {% endblock %}
 
@@ -406,6 +409,7 @@ function layoutLocalRow() {
     const isLoop = JSON.parse(document.getElementById('is-loop-data')?.textContent || 'false');
     const loopHasTerminal = JSON.parse(document.getElementById('loop-has-terminal-data')?.textContent || 'false');
     const loopTerminalStation = JSON.parse(document.getElementById('loop-terminal-data')?.textContent || '""');
+    const terminalStation = JSON.parse(document.getElementById('terminal-data')?.textContent || '""');
     const row = document.getElementById('local-line-row');
     const container = document.querySelector('.local-line-container');
     if (!Array.isArray(lineInfo) || !row || !container || !nextStationName) return;
@@ -442,6 +446,7 @@ function layoutLocalRow() {
             if (!rightIdxs.includes(idx)) rightIdxs.push(idx);
             const isTerminal = !!(isLoop && loopHasTerminal && loopTerminalStation && (lineInfo[idx]?.station_name === loopTerminalStation));
             if (isTerminal) break;
+            if (lineInfo[idx]?.station_name === terminalStation) break;
             idx = idx + 1;
             if (idx >= n) { idx = 0; looped = true; }
             if (looped && idx === i) break; // 绕一圈返回到起点则停止
@@ -453,6 +458,7 @@ function layoutLocalRow() {
             if (!rightIdxs.includes(idx)) rightIdxs.push(idx);
             const isTerminal = !!(isLoop && loopHasTerminal && loopTerminalStation && (lineInfo[idx]?.station_name === loopTerminalStation));
             if (isTerminal) break;
+            if (lineInfo[idx]?.station_name === terminalStation) break;
             idx = idx - 1;
             if (idx < 0) { idx = n - 1; looped = true; }
             if (looped && idx === i) break; // 绕一圈返回到起点则停止
