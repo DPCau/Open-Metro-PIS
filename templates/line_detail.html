@@ -428,9 +428,17 @@ function layoutLocalRow() {
     // 左侧两站（已过与刚离开）根据方向判断
     const leftIdxs = [];
     if (direction === 0 || direction === '0') {
-        if (i - 1 >= 0) leftIdxs.push(i - 1);
+        if (i - 1 >= 0) {
+            leftIdxs.push(i - 1);
+        } else if (isLoop && !loopHasTerminal) {
+            leftIdxs.push(n - 1);
+        }
     } else {
-        if (i + 1 <= n - 1) leftIdxs.push(i + 1);
+        if (i + 1 <= n - 1) {
+            leftIdxs.push(i + 1);
+        } else if (isLoop && !loopHasTerminal) {
+            leftIdxs.push(0);
+        }
     }
 
     const minLeftCount = leftIdxs.length; // 可用的左侧数量（最多1）

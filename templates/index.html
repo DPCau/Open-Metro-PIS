@@ -171,7 +171,7 @@
             {% set has_multiple = route_services|length > 1 %}
             {% for svc in route_services %}
                 <div class="route-label {{ 'active' if svc.is_main else '' }}">运营线路{% if has_multiple %}{{ loop.index }}{% endif %}</div>
-                <div class="route-line {{ 'active' if svc.is_main else '' }} {{ 'loop' if svc.is_loop else '' }} {{ 'single' if svc.is_loop and not svc.has_terminal else '' }}" data-total="{{ svc.total }}" data-stations="{{ (svc.stations or []) | join('|') }}">
+                <div class="route-line {{ 'active' if svc.is_main else '' }} {{ 'loop' if svc.is_loop else '' }} {{ 'single' if svc.is_loop and not svc.has_terminal else '' }}" data-total="{{ svc.total }}" data-stations="{{ (svc.stations or []) | join('|') }}" data-next="{{ next_station }}" data-direction="{{ direction }}" data-terminal="{{ svc.end if svc.is_loop else terminal_station }}" data-is-loop="{{ 1 if svc.is_loop else 0 }}" data-has-terminal="{{ 1 if svc.has_terminal else 0 }}">
                      <div class="terminal-station">
                          <div class="term-cn">{{ svc.start }}</div>
                          <div class="term-en">
@@ -258,16 +258,39 @@
             function layoutRouteLines() {
                 const routeLines = Array.from(document.querySelectorAll('.route-line'));
                 
-                // 基于未截断的总站数计算线路的相对长度（来自data-total）
-                const lineTotals = routeLines.map(line => {
-                    const total = parseInt(line.getAttribute('data-total') || '0', 10);
-                    return isNaN(total) ? 0 : total;
-                });
-                const maxTotal = Math.max(...lineTotals);
-                
-                // 选择"最长线路"作为锚线（不依赖active）
-                let anchorIdx = lineTotals.indexOf(maxTotal);
-                if (anchorIdx < 0) anchorIdx = 0;
+                function computeEffectiveTotal(line) {
+                    const isLoop = (line.getAttribute('data-is-loop') || '0') === '1';
+                    const hasTerminal = (line.getAttribute('data-has-terminal') || '0') === '1';
+                    if (!isLoop || !hasTerminal) {
+                        const t = parseInt(line.getAttribute('data-total') || '0', 10);
+                        return isNaN(t) ? 0 : t;
+                    }
+                    const stationsRaw = (line.getAttribute('data-stations') || '').split('|').map(s => s.trim()).filter(Boolean);
+                    const nextName = (line.getAttribute('data-next') || '').trim();
+                    const terminalName = (line.getAttribute('data-terminal') || '').trim();
+                    if (!stationsRaw.length || !terminalName) {
+                        const t = parseInt(line.getAttribute('data-total') || '0', 10);
+                        return isNaN(t) ? 0 : t;
+                    }
+                    const n = stationsRaw.length;
+                    let startIdx = stationsRaw.indexOf(nextName);
+                    if (startIdx < 0) startIdx = 0;
+                    const termIdx = stationsRaw.indexOf(terminalName);
+                    if (termIdx < 0) {
+                        const t = parseInt(line.getAttribute('data-total') || '0', 10);
+                        return isNaN(t) ? n : t;
+                    }
+                    if (termIdx >= startIdx) return (termIdx - startIdx + 1);
+                    return (n - startIdx + termIdx + 1);
+                }
+                const effectiveTotals = routeLines.map(computeEffectiveTotal);
+                let maxTotal = Math.max(...effectiveTotals);
+                let anchorIdx = -1;
+                for (let i = 0; i < routeLines.length; i++) {
+                    const single = routeLines[i].classList.contains('single');
+                    if (!single && effectiveTotals[i] >= (maxTotal || 0)) { anchorIdx = i; break; }
+                }
+                if (anchorIdx < 0) anchorIdx = effectiveTotals.indexOf(maxTotal);
                 const anchorLine = routeLines[anchorIdx];
                 const anchorStart = anchorLine?.querySelector('.terminal-station:first-of-type');
                 const anchorEnd = anchorLine?.querySelector('.terminal-station:last-of-type');
@@ -305,7 +328,7 @@
                     const endText = (end.textContent || '').trim();
                     
                     // 目标轨宽：与锚线轨宽按总站数比例
-                    const lengthRatio = maxTotal > 0 ? (lineTotals[index] / maxTotal) : 1;
+                    const lengthRatio = maxTotal > 0 ? (effectiveTotals[index] / maxTotal) : 1;
                     const targetRailWidth = Math.max(0, Math.floor(anchorRailWidth * lengthRatio));
                     const shrink = Math.max(0, anchorRailWidth - targetRailWidth);
                     
@@ -355,15 +378,30 @@
                             }
                         }
                     }
+                    // 让终点标签与轨道末端重合：用margin将标签中心对齐轨端
+                    const startRectWidth = startRect.width;
+                    const endRectWidth = endRect.width;
+                    let startMarginLeft = Math.max(0, Math.round(leftInset - startRectWidth / 2));
+                    let endMarginRight = Math.max(0, Math.round(rightInset - endRectWidth / 2));
+                    const isLoopLine = line.classList.contains('loop');
+                    const hasTerminal = (line.getAttribute('data-has-terminal') || '0') === '1';
+                    if (isLoopLine && hasTerminal) {
+                        const startCenterX = startMarginLeft + startRectWidth / 2;
+                        const endCenterX = Math.max(0, Math.floor(lineRect.width - endMarginRight - endRectWidth / 2));
+                        const minCenterGap = Math.max(startRectWidth, endRectWidth) + 12;
+                        if ((endCenterX - startCenterX) < minCenterGap) {
+                            startMarginLeft = 0;
+                            endMarginRight = 0;
+                            // 重新计算轨道缩进以对齐新的气泡中心
+                            leftInset = Math.round(startRectWidth / 2);
+                            rightInset = Math.round(endRectWidth / 2);
+                        }
+                    }
+
                     const railWidth = Math.max(0, Math.floor(lineRect.width - leftInset - rightInset));
                     line.style.setProperty('--rail-left', leftInset + 'px');
                     line.style.setProperty('--rail-width', railWidth + 'px');
 
-                    // 让终点标签与轨道末端重合：用margin将标签中心对齐轨端
-                    const startRectWidth = startRect.width;
-                    const endRectWidth = endRect.width;
-                    const startMarginLeft = Math.max(0, Math.round(leftInset - startRectWidth / 2));
-                    const endMarginRight = Math.max(0, Math.round(rightInset - endRectWidth / 2));
                     start.style.marginLeft = startMarginLeft + 'px';
                     end.style.marginRight = endMarginRight + 'px';
                     
@@ -376,7 +414,7 @@
                         const indicators = Array.from(wrap.querySelectorAll('.station-indicator'));
                         const originalCount = indicators.length;
                         let visibleCount = Math.max(2, Math.floor(originalCount * lengthRatio));
-                        if (lineTotals[index] < maxTotal * 0.5) {
+                        if (effectiveTotals[index] < maxTotal * 0.5) {
                             visibleCount = Math.max(2, Math.floor(originalCount * lengthRatio * 0.8));
                         }
                         wrap.classList.add('grid');

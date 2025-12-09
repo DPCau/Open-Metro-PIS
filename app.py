@@ -60,9 +60,9 @@ except Exception as e:
 # 模拟当前状态数据
 current_state = {
     'line_name': 'line_7',
-    'route_name': 'route2',
+    'route_name': 'route1',
     'next_station': '二仙桥',
-    'direction':0, # 方向：0与数据文件顺序一致，1为反向（显示反转）
+    'direction':1, # 方向：0与数据文件顺序一致，1为反向（显示反转）
     'door_side': '本侧',  # 本侧或对侧
     'current_carriage': 3
 }
@@ -561,6 +561,25 @@ def line_detail():
             except Exception as e:
                 print(f"从数据文件获取线路详情失败: {e}")
         
+        # 线路类型与环线终点（与 line_map 保持一致的字段）
+        is_loop = False
+        loop_has_terminal = False
+        loop_terminal_station = ''
+        try:
+            route_data = _get_route_data()
+            d = route_data.get(line_name, {})
+            is_loop = (d.get('type') == 'loop')
+            services = d.get('services', [])
+            for s in services:
+                name = s.get('type') or s.get('service_name')
+                if name == route_name:
+                    term = (s.get('terminal_station') or '').strip()
+                    loop_has_terminal = bool(term)
+                    loop_terminal_station = term
+                    break
+        except Exception:
+            pass
+
         # 当前站与下一站
         current_station_info = None
         next_station_info = None
@@ -574,7 +593,14 @@ def line_detail():
                     if i - 1 >= 0:
                         current_station_info = line_info[i - 1]
                     break
-            terminal_station = line_info[-1].get('station_name') if direction == 0 else line_info[0].get('station_name')
+            
+            # 确定终点站用于前端截断逻辑
+            if is_loop and not loop_has_terminal:
+                # 无终点环线：不设置终点站，允许前端循环显示
+                terminal_station = None
+            else:
+                # 线性线路或有终点环线：取列表两端
+                terminal_station = line_info[-1].get('station_name') if direction == 0 else line_info[0].get('station_name')
         
         # 计算下一站的换乘线路（显示名与徽章），排除当前线路
         transfer_lines_display = []
@@ -620,56 +646,11 @@ def line_detail():
                         transfer_badges.append({'code': code_disp, 'color': fallback_get_line_color(key)})
             except Exception:
                 pass
-        
-        # 线路类型与环线终点（与 line_map 保持一致的字段）
-        is_loop = False
-        loop_has_terminal = False
-        loop_terminal_station = ''
-        try:
-            route_data = _get_route_data()
-            d = route_data.get(line_name, {})
-            is_loop = (d.get('type') == 'loop')
-            services = d.get('services', [])
-            for s in services:
-                name = s.get('type') or s.get('service_name')
-                if name == route_name:
-                    term = (s.get('terminal_station') or '').strip()
-                    loop_has_terminal = bool(term)
-                    loop_terminal_station = term
-                    break
-        except Exception:
-            pass
-        
+
         # 翻译数据
         trans_data = _get_trans_data()
         
-        # 环线终点站：按运行方向仅在末端追加（direction=0 末尾；direction=1 开头）
-        try:
-            if is_loop and loop_has_terminal and loop_terminal_station and isinstance(line_info, list):
-                # 运行方向：0 正向，1 反向
-                try:
-                    dir_val = int(current_state.get('direction', 0))
-                except Exception:
-                    dir_val = 0
-                # 查找终点对象
-                term_idx = next((i for i, s in enumerate(line_info) if s.get('station_name') == loop_terminal_station), -1)
-                if term_idx >= 0:
-                    term_obj = dict(line_info[term_idx])
-                else:
-                    term_obj = {
-                        'station_name': loop_terminal_station,
-                        'station_name_en': trans_data.get(loop_terminal_station, loop_terminal_station)
-                    }
-                if dir_val == 1:
-                    # 反向运行：若首站不是终点，则在开头追加
-                    if not (len(line_info) > 0 and (line_info[0].get('station_name') == loop_terminal_station)):
-                        line_info = [term_obj] + line_info[:-1]
-                else:
-                    # 正向运行：若末站不是终点，则在结尾追加
-                    if not (len(line_info) > 0 and (line_info[-1].get('station_name') == loop_terminal_station)):
-                        line_info = line_info + [term_obj]
-        except Exception:
-            pass
+        # 环线终点站按字段识别，序列保持原始顺序由前端按方向截取
         return render_template('line_detail.html',
                               line_info=line_info,
                               current_station_info=current_station_info,
