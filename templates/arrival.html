@@ -306,7 +306,7 @@
                 本站可换乘：
                 <span class="transfer-badges" style="display:inline-flex; gap:8px; vertical-align:middle;">
                     {% for b in transfer_badges %}
-                    <span class="transfer-badge" style="display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; font-weight:bold; color:#fff;" data-color="{{ b.color }}">{{ b.code }}</span>
+                    <span class="transfer-badge" style="display:inline-flex; align-items:center; justify-content:center; height:24px; font-weight:bold; color:#fff; {% if b.code|string|length > 1 %}width:auto; min-width:24px; padding:0 5px; border-radius:12px;{% else %}width:24px; border-radius:50%;{% endif %}" data-color="{{ b.color }}">{{ b.code }}</span>
                     {% endfor %}
                 </span>
             {% else %}

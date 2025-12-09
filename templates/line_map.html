@@ -39,7 +39,7 @@
                 <span class="transfer-label" style="font-size: 13px;">Transfer</span>
                 <span class="next-transfer-badges">
                     {% for b in transfer_badges %}
-                    <span class="transfer-badge" data-color="{{ b.color }}">{{ b.code }}</span>
+                    <span class="transfer-badge {% if b.code|string|length > 1 %}wide{% endif %}" data-color="{{ b.color }}">{{ b.code }}</span>
                     {% endfor %}
                 </span>
             </div>
@@ -88,7 +88,7 @@
     
     .line-map-container {
         width: 100%;
-        padding: 20px 0;
+        padding: 60px 0; /* 增大顶部间距 */
         min-height: 75vh; /* 增加画布高度：可根据需要调整比例 */
         overflow: hidden; /* 保证内容不超出白色画布 */
     }
@@ -103,21 +103,22 @@
         flex-wrap: wrap;
         align-items: center;
         justify-content: flex-start;
-        gap: 60px;
-        margin-top: 20px;
+        gap: 25px;
+        margin-top: 80px;
         margin-bottom: 40px;
         position: relative;
         width: 100%;
+        padding: 0 40px;
     }
     
     .line-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 60px;
+        gap: 25px;
         position: relative;
         width: 100%;
-        margin-bottom: 40px;
+        margin-bottom: 100px;
     }
     
     .line-row:last-child {
@@ -220,8 +221,8 @@
     .station-node {
         position: relative;
         z-index: 2;
-        min-width: 80px;
-        width: 80px;
+        min-width: 40px;
+        width: 40px;
         height: 10px;
     }
     
@@ -301,17 +302,23 @@
     
     .station-labels {
         position: absolute;
-        top: calc(50% + 28px);
+        bottom: 25px;
         left: 50%;
-        transform: translateX(-50%);
-        text-align: center;
+        transform-origin: bottom left;
+        transform: rotate(-45deg);
+        text-align: left;
         width: 140px;
+        display: flex;
+        flex-direction: column-reverse;
+        pointer-events: none;
     }
     .station-name {
-        font-size: 12px;
+        font-size: 13px;
         color: #333;
-        text-align: center;
+        text-align: left;
         line-height: 1.2;
+        white-space: nowrap;
+        font-weight: bold;
     }
     .station-name.current {
         color: #ff4757;
@@ -327,11 +334,15 @@
     
     .transfer-badges {
         position: absolute;
-        top: calc(50% - 37px);
+        top: 25px;
         left: 50%;
         transform: translateX(-50%);
-        display: inline-flex;
-        gap: 6px;
+        display: flex;
+        flex-direction: row; /* 修改为水平排列 */
+        flex-wrap: wrap; /* 允许换行 */
+        width: 46px; /* 两个徽章宽度22*2 + 间距2 = 46px */
+        justify-content: center; /* 单个徽章时居中对齐 */
+        gap: 2px;
         z-index: 3;
     }
     .transfer-badge {
@@ -344,6 +355,12 @@
         font-size: 12px;
         color: white;
         font-weight: bold;
+    }
+    .transfer-badge.wide {
+        width: auto;
+        min-width: 22px;
+        padding: 0 5px;
+        border-radius: 11px;
     }
     
     
@@ -413,7 +430,7 @@ function createStationNode(station) {
             ${station.transfer_badges && station.transfer_badges.length > 0 ? `
                 <div class="transfer-badges">
                     ${station.transfer_badges.map(b => `
-                        <div class="transfer-badge" data-color="${b.color}">${b.code}</div>
+                        <div class="transfer-badge ${String(b.code).length > 1 ? 'wide' : ''}" data-color="${b.color}">${b.code}</div>
                     `).join('')}
                 </div>
             ` : ''}
@@ -433,12 +450,14 @@ function calculateStationsPerRow() {
     const container = document.querySelector('.line-map-container');
     // 更稳健的宽度测量，避免初次渲染方向切换导致的宽度偏差
     const containerWidth = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
-    const stationWidth = 80; // 站点节点宽度
-    const gap = 60; // 站点间距
+    const stationWidth = 40; // 站点节点宽度
+    const stationSpacingMultiplier = parseFloat('{{ station_spacing_multiplier }}') || 1.0; // 获取倍数，默认为1.0
+    const gap = 25 * stationSpacingMultiplier; // 站点间距，乘以倍数
     const margin = 40; // 边距
     
     const availableWidth = Math.max(0, containerWidth - margin * 2);
-    const stationsPerRow = Math.floor(availableWidth / (stationWidth + gap));
+    // 修正计算公式：N个站点需要N-1个间距，公式为 N*w + (N-1)*g <= W => N*(w+g) - g <= W => N <= (W+g)/(w+g)
+    const stationsPerRow = Math.floor((availableWidth + gap) / (stationWidth + gap));
     
     return Math.max(1, stationsPerRow);
 }
@@ -447,6 +466,19 @@ function calculateStationsPerRow() {
 function createZigzagLayout() {
     const metroLine = document.getElementById('metro-line');
     const stationsPerRow = calculateStationsPerRow();
+
+    // 计算满行时的动态间距，用于给不满的行设置相同的间距
+    const container = document.querySelector('.line-map-container');
+    const containerWidth = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
+    const margin = 40;
+    const availableWidth = Math.max(0, containerWidth - margin * 2);
+    const stationWidth = 40;
+    // 如果只有1列，gap无意义；否则计算均匀分布后的实际gap
+    const stationSpacingMultiplier = parseFloat('{{ station_spacing_multiplier }}') || 1.0; // 获取倍数，默认为1.0
+    let dynamicGap = 25 * stationSpacingMultiplier; 
+    if (stationsPerRow > 1) {
+        dynamicGap = (availableWidth - stationsPerRow * stationWidth) / (stationsPerRow - 1);
+    }
 
     // 计算全局“下一站”索引并存入容器数据属性
     const globalNextIndex = lineInfo.findIndex(s => s.station_name === nextStationName);
@@ -483,6 +515,12 @@ function createZigzagLayout() {
         const startIndex = currentIndex;
         const endIndex = Math.min(currentIndex + stationsPerRow, lineInfo.length);
         const rowStations = lineInfo.slice(startIndex, endIndex);
+
+        // 如果该行不满（通常是最后一行），改用 flex-start 并设置 calculated gap
+        if (rowStations.length < stationsPerRow) {
+            row.style.justifyContent = 'flex-start';
+            row.style.gap = `${dynamicGap}px`;
+        }
         
         // 记录该行的索引范围（闭区间）
         row.dataset.startIndex = String(startIndex);
@@ -1086,77 +1124,43 @@ function renderLoopMap() {
         node.style.top = `${pt.y}px`;
         node.style.transform = 'translate(-50%, -50%)';
         // 站名外侧，换乘内侧（按所在边）
+        // 侧边特殊处理：用户要求侧边站点“文字左下对齐站点，站点左侧水平排列换乘数字”
+        // 顶/底边保持默认CSS样式（文字上偏右，换乘下垂直）
         const labels = node.querySelector('.station-labels');
         const badges = node.querySelector('.transfer-badges');
         const tol = 20;
-        const labelOffset = 58; // 站名外侧与圆的间距
-        const badgeOffset = 37; // 换乘徽章距离圆心偏移
-        if (labels) {
-            const circleR = 15; // 站点圆半径
-            const gapOut = 18;  // 站名外侧与圆的间距
-            const labelWidth = 140; // 与CSS保持一致
-            const nodeHalf = 40; // station-node宽80的一半
-            const safeMinX = margin + 8; // 画布左内边距
-            const safeMaxX = width - margin - 8; // 画布右内边距
-            if (Math.abs(pt.y - margin) < tol) {
-                // 顶边：外侧在上方
-                labels.style.top = `calc(50% - ${labelOffset}px)`;
-                labels.style.left = '50%';
-                labels.style.transform = 'translateX(-50%)';
-            } else if (Math.abs(pt.y - (margin + H)) < tol) {
-                // 底边：外侧在下方
-                labels.style.top = `calc(50% + ${labelOffset - 30}px)`;
-                labels.style.left = '50%';
-                labels.style.transform = 'translateX(-50%)';
-            } else if (Math.abs(pt.x - margin) < tol) {
-                // 左边：外侧在左方（带防溢出修正）
-                let A = circleR + gapOut;
-                const anchorX = pt.x + (nodeHalf - A);
-                const leftBound = anchorX - labelWidth;
-                if (leftBound < safeMinX) {
-                    const delta = safeMinX - leftBound;
-                    A = Math.max(0, A - delta);
-                }
-                labels.style.top = '50%';
-                labels.style.left = `calc(50% - ${A}px)`;
-                labels.style.transform = 'translate(-100%, -50%)';
-            } else {
-                // 右边：外侧在右方（带防溢出修正）
-                let A = circleR + gapOut;
-                const anchorX = pt.x + (nodeHalf + A);
-                const rightBound = anchorX + labelWidth;
-                if (rightBound > safeMaxX) {
-                    const delta = rightBound - safeMaxX;
-                    A = Math.max(0, A - delta);
-                }
-                labels.style.top = '50%';
-                labels.style.left = `calc(50% + ${A}px)`;
-                labels.style.transform = 'translate(0, -50%)';
+        
+        // 判断是否在左右侧边（垂直段）
+        const isLeft = Math.abs(pt.x - margin) < tol;
+        const isRight = Math.abs(pt.x - (margin + W)) < tol;
+        
+        if (isLeft) {
+            if (labels) {
+                labels.style.left = '-100%'; // 站点左侧
+                labels.style.bottom = '-500%'; // 站点上方
             }
-        }
-        if (badges) {
-            const circleR = 15; // 站点圆半径
-            const inset = 22;   // 徽章在圆内侧的间距
-            if (Math.abs(pt.y - margin) < tol) {
-                // 顶边：内侧在下方
-                badges.style.top = `calc(50% + ${badgeOffset}px)`;
-                badges.style.left = '50%';
-                badges.style.transform = 'translateX(-50%)';
-            } else if (Math.abs(pt.y - (margin + H)) < tol) {
-                // 底边：内侧在上方
-                badges.style.top = `calc(50% - ${badgeOffset}px)`;
-                badges.style.left = '50%';
-                badges.style.transform = 'translateX(-50%)';
-            } else if (Math.abs(pt.x - margin) < tol) {
-                // 左边：内侧在右方
+            if (badges) {
                 badges.style.top = '50%';
-                badges.style.left = `calc(50% + ${circleR + inset}px)`;
-                badges.style.transform = 'translate(-50%, -50%)';
-            } else {
-                // 右边：内侧在左方
+                badges.style.bottom = 'auto';
+                badges.style.left = '30px'; // 距离左边界38px
+                badges.style.right = 'auto';
+                badges.style.transform = 'translateY(-50%)';
+                badges.style.flexDirection = 'row';
+                badges.style.gap = '2px';
+            }
+        } else if (isRight) {
+            if (labels) {
+                labels.style.left = '120%'; // 站点右侧
+                labels.style.bottom = '0%'; // 站点上方
+            }
+            if (badges) {
                 badges.style.top = '50%';
-                badges.style.left = `calc(50% - ${circleR + inset}px)`;
-                badges.style.transform = 'translate(-50%, -50%)';
+                badges.style.bottom = 'auto';
+                badges.style.left = 'auto';
+                badges.style.right = '30px'; 
+                badges.style.transform = 'translateY(-50%)';
+                badges.style.flexDirection = 'row';
+                badges.style.gap = '2px';
             }
         }
         // 静态线路图：不做已过站灰显

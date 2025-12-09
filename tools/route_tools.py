@@ -144,7 +144,27 @@ class RouteTools:
         if self.route_data is None:
             self._load_data()
         info = self.route_data.get(line_key, {})
-        return info.get('line_name', line_key)
+        full_name = info.get('line_name', line_key)
+        if '-' in full_name:
+            return full_name.split('-')[0]
+        return full_name
+
+    def get_line_en_name(self, line_key):
+        """获取线路英文名称"""
+        if self.route_data is None:
+            self._load_data()
+        info = self.route_data.get(line_key, {})
+        full_name = info.get('line_name', line_key)
+        if '-' in full_name:
+            return full_name.split('-')[1]
+        
+        # 默认回退逻辑
+        if line_key.startswith('line_'):
+            part = line_key[5:]
+            if part.isdigit():
+                return f"Line {part}"
+            return f"Line {part}"
+        return line_key
     
     def _line_code_from_key(self, line_key):
         """从'line_5'或'line_S3'解析出站点索引里的线路代码（数字两位、字母数字原样）"""

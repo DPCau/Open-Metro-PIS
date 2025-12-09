@@ -13,7 +13,16 @@
         <div class="line-sub-info-en">{% if direction|int == 1 %}Inner Loop{% else %}Outer Loop{% endif %}</div>
     {% endif %}
 {% else %}
-    {% set terminal_station_for_dir = (line_info[-1].station_name if line_info and line_info|length > 0 else '') %}
+    {% set terminal_station_for_dir = '' %}
+    {% if current_route_stations and current_route_stations|length > 0 %}
+        {% if direction|int == 0 %}
+            {% set terminal_station_for_dir = current_route_stations[-1] %}
+        {% else %}
+            {% set terminal_station_for_dir = current_route_stations[0] %}
+        {% endif %}
+    {% elif line_info and line_info|length > 0 %}
+        {% set terminal_station_for_dir = (line_info[-1].station_name if direction|int == 0 else line_info[0].station_name) %}
+    {% endif %}
     终点站：<strong>{{ terminal_station_for_dir }}</strong>
     <div class="line-sub-info-en">Terminal: <strong>{{ trans_data.get(terminal_station_for_dir, terminal_station_for_dir).replace('<br>', ' ') }}</strong></div>
 {% endif %}
@@ -30,7 +39,7 @@
                 <span class="transfer-label" style="font-size: 13px;">Transfer</span>
                 <span class="next-transfer-badges">
                     {% for b in transfer_badges %}
-                    <span class="transfer-badge" data-color="{{ b.color }}">{{ b.code }}</span>
+                    <span class="transfer-badge {% if b.code|string|length > 1 %}wide{% endif %}" data-color="{{ b.color }}">{{ b.code }}</span>
                     {% endfor %}
                 </span>
             </div>
@@ -77,6 +86,7 @@
     .next-transfer-badges { display: inline-flex; gap: 6px; }
     /* 复用 .transfer-badge 尺寸与圆形样式 */
     .transfer-badge { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: bold; }
+    .transfer-badge.wide { width: auto; min-width: 22px; padding: 0 5px; border-radius: 11px; }
     .local-line-container {
         width: 100%;
         padding: 20px 0;
@@ -290,7 +300,7 @@ function createStationNode(station, isNext = false, isPassed = false) {
         ${station.transfer_badges && station.transfer_badges.length > 0 ? `
             <div class="transfer-badges">
                 ${station.transfer_badges.map(b => `
-                    <div class="transfer-badge" data-color="${b.color}">${b.code}</div>
+                    <div class="transfer-badge ${String(b.code).length > 1 ? 'wide' : ''}" data-color="${b.color}">${b.code}</div>
                 `).join('')}
             </div>
         ` : ''}

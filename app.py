@@ -19,9 +19,26 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 
 # 加载应用配置
+def get_current_city():
+    """获取当前配置的城市"""
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'city_config.json')
+    default_city = 'chengdu'
+    try:
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get('current_city', default_city)
+    except Exception:
+        pass
+    return default_city
+
+def get_data_dir():
+    """获取当前城市的数据目录"""
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', get_current_city())
+
 def load_app_config():
     """加载应用配置文件"""
-    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config', 'config.json')
+    config_path = os.path.join(get_data_dir(), 'config.json')
     default_config = {
         'app_name': 'PIS系统',
         'copyright_year': '2025',
@@ -52,19 +69,26 @@ app_config = load_app_config()
 tools = None
 try:
     if route_tools_available:
-        tools = RouteTools()
-        print("成功初始化RouteTools")
+        data_dir = get_data_dir()
+        tools = RouteTools(
+            route_file_path=os.path.join(data_dir, 'route.json'),
+            station_file_path=os.path.join(data_dir, 'station.json'),
+            trans_file_path=os.path.join(data_dir, 'trans_name.json'),
+            color_file_path=os.path.join(data_dir, 'color.json')
+        )
+        print(f"成功初始化RouteTools (数据目录: {data_dir})")
 except Exception as e:
     print(f"初始化RouteTools失败: {e}")
 
 # 模拟当前状态数据
 current_state = {
-    'line_name': 'line_7',
+    'line_name': 'line_3',
     'route_name': 'route1',
-    'next_station': '二仙桥',
+    'next_station': '四公里',
     'direction':1, # 方向：0与数据文件顺序一致，1为反向（显示反转）
     'door_side': '本侧',  # 本侧或对侧
-    'current_carriage': 3
+    'current_carriage': 3,
+    'station_spacing_multiplier': 1 # 站点间距倍数，大于1
 }
 
 
@@ -311,9 +335,26 @@ def index():
 
     # 获取翻译数据
     trans_data = _get_trans_data()
+
+    # 获取线路中英文名
+    line_display_name = None
+    line_en_name = None
+    try:
+        ln = current_state.get('line_name')
+        if ln:
+            if tools is not None:
+                line_display_name = tools.get_line_display_name(ln)
+                line_en_name = tools.get_line_en_name(ln)
+            else:
+                line_display_name = fallback_get_line_display_name(ln)
+                line_en_name = fallback_get_line_en_name(ln)
+    except Exception:
+        pass
     
     return render_template('index.html',
                            line_color=line_color,
+                           line_display_name=line_display_name,
+                           line_en_name=line_en_name,
                            terminal_station=terminal_station,
                            start_station=start_station,
                            route_services=route_services,
@@ -337,11 +378,13 @@ def line_map():
         
         line_info = None
         line_display_name = line_name
+        line_en_name = None
         line_color = None
         if tools is not None:
             try:
                 line_info = tools.get_line_map_info(line_name, route_name)
                 line_display_name = tools.get_line_display_name(line_name)
+                line_en_name = tools.get_line_en_name(line_name)
                 line_color = tools.get_line_color(line_name)
             except Exception as e:
                 print(f"从RouteTools获取线路图信息失败: {e}")
@@ -351,6 +394,7 @@ def line_map():
             try:
                 line_info = fallback_get_line_map_info(line_name, route_name)
                 line_display_name = fallback_get_line_display_name(line_name)
+                line_en_name = fallback_get_line_en_name(line_name)
                 line_color = fallback_get_line_color(line_name)
             except Exception as e:
                 print(f"从数据文件获取线路图信息失败: {e}")
@@ -421,6 +465,7 @@ def line_map():
                     try:
                         full_line_info = tools.get_line_map_info(line_name, candidate_full)
                         line_display_name = tools.get_line_display_name(line_name)
+                        line_en_name = tools.get_line_en_name(line_name)
                         line_color = tools.get_line_color(line_name)
                     except Exception:
                         full_line_info = None
@@ -428,6 +473,7 @@ def line_map():
                     try:
                         full_line_info = fallback_get_line_map_info(line_name, candidate_full)
                         line_display_name = fallback_get_line_display_name(line_name)
+                        line_en_name = fallback_get_line_en_name(line_name)
                         line_color = fallback_get_line_color(line_name)
                     except Exception:
                         full_line_info = None
@@ -523,6 +569,7 @@ def line_map():
         return render_template('line_map.html', 
                                 line_info=line_info,
                                 line_display_name=line_display_name,
+                                line_en_name=line_en_name,
                                 line_color=line_color,
                                 is_reversed=is_reversed,
                                 is_loop=is_loop,
@@ -548,9 +595,13 @@ def line_detail():
         
         # 获取富含英文名与换乘信息的线路数据
         line_info = None
+        line_display_name = line_name
+        line_en_name = None
         if tools is not None:
             try:
                 line_info = tools.get_line_map_info(line_name, route_name)
+                line_display_name = tools.get_line_display_name(line_name)
+                line_en_name = tools.get_line_en_name(line_name)
             except Exception as e:
                 print(f"从RouteTools获取线路详情数据失败: {e}")
         
@@ -558,6 +609,8 @@ def line_detail():
         if line_info is None:
             try:
                 line_info = fallback_get_line_map_info(line_name, route_name)
+                line_display_name = fallback_get_line_display_name(line_name)
+                line_en_name = fallback_get_line_en_name(line_name)
             except Exception as e:
                 print(f"从数据文件获取线路详情失败: {e}")
         
@@ -653,6 +706,8 @@ def line_detail():
         # 环线终点站按字段识别，序列保持原始顺序由前端按方向截取
         return render_template('line_detail.html',
                               line_info=line_info,
+                              line_display_name=line_display_name,
+                              line_en_name=line_en_name,
                               current_station_info=current_station_info,
                               next_station_info=next_station_info,
                               transfer_lines_display=transfer_lines_display,
@@ -679,9 +734,13 @@ def arrival():
         
         # 获取线路信息（含英文名、换乘信息）
         line_info = None
+        line_display_name = line_name
+        line_en_name = None
         if tools is not None:
             try:
                 line_info = tools.get_line_map_info(line_name, route_name)
+                line_display_name = tools.get_line_display_name(line_name)
+                line_en_name = tools.get_line_en_name(line_name)
             except Exception as e:
                 print(f"从RouteTools获取到站数据失败: {e}")
         
@@ -689,6 +748,8 @@ def arrival():
         if line_info is None:
             try:
                 line_info = fallback_get_line_map_info(line_name, route_name)
+                line_display_name = fallback_get_line_display_name(line_name)
+                line_en_name = fallback_get_line_en_name(line_name)
             except Exception as e:
                 print(f"从数据文件获取到站数据失败: {e}")
         
@@ -749,6 +810,8 @@ def arrival():
         
         return render_template('arrival.html',
                               current_station_info=current_station_info,
+                              line_display_name=line_display_name,
+                              line_en_name=line_en_name,
                               next_station_info=next_station_info,
                               exits=exits,
                               facilities=facilities,
@@ -926,7 +989,7 @@ def ensure_directories():
 _DATA_CACHE = {}
 
 def _data_path(name):
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', name)
+    return os.path.join(get_data_dir(), name)
 
 def _load_json(name):
     try:
@@ -970,7 +1033,22 @@ def _line_code_from_key(line_key):
 def fallback_get_line_display_name(line_key):
     route_data = _get_route_data()
     d = route_data.get(line_key, {})
-    return d.get('line_name', line_key)
+    full_name = d.get('line_name', line_key)
+    if '-' in full_name:
+        return full_name.split('-')[0]
+    return full_name
+
+def fallback_get_line_en_name(line_key):
+    route_data = _get_route_data()
+    d = route_data.get(line_key, {})
+    full_name = d.get('line_name', line_key)
+    if '-' in full_name:
+        return full_name.split('-')[1]
+    
+    if line_key.startswith('line_'):
+        part = line_key[5:]
+        return f"Line {part}"
+    return line_key
 
 def fallback_get_line_color(line_key):
     color_data = _get_color_data()
