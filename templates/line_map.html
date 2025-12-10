@@ -140,6 +140,11 @@
         --arrow-color-gray: #555;
         --arrow-color-red: #ff3b30;
         --arrow-blink-duration: 1s;
+        --one-label-offset: 8px;
+        --one-badge-offset: 4px;
+        --two-label-offset: 6px;
+        --two-badge-offset: 4px;
+        --two-label-angle: -45deg;
     }
     /* 基础灰色轨道（已走过段） */
     .line-row::after {
@@ -329,8 +334,25 @@
         color: #666;
         margin-top: 2px;
     }
-    
 
+    /* 岔路连接线 */
+    .branch-connector {
+        position: absolute;
+        z-index: 0;
+        transform-origin: 0 50%;
+    }
+
+    /* 岔路行样式 */
+    .branch-row {
+        /* 确保无额外边框 */
+        border: none !important; 
+    }
+    
+    /* 未激活的岔路行：隐藏彩色进度条 */
+    .branch-row.inactive-row::before {
+        width: 0 !important;
+        display: none !important;
+    }
     
     .transfer-badges {
         position: absolute;
@@ -340,7 +362,7 @@
         display: flex;
         flex-direction: row; /* 修改为水平排列 */
         flex-wrap: wrap; /* 允许换行 */
-        width: 46px; /* 两个徽章宽度22*2 + 间距2 = 46px */
+        width: 82px; /* 两个宽徽章(约36-38px) + 间距2 = ~78px，给82px余量 */
         justify-content: center; /* 单个徽章时居中对齐 */
         gap: 2px;
         z-index: 3;
@@ -361,6 +383,75 @@
         min-width: 22px;
         padding: 0 5px;
         border-radius: 11px;
+    }
+
+    .layout-one-line .station-labels {
+        transform: translateX(-50%);
+        left: 50%;
+        text-align: center;
+        width: max-content;
+    }
+    .layout-one-line .station-node:nth-child(odd) .station-labels {
+        bottom: calc(200% + var(--one-label-offset));
+        top: auto;
+    }
+    .layout-one-line .station-node:nth-child(odd) .transfer-badges {
+        top: calc(200% + var(--one-badge-offset));
+        bottom: auto;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+    .layout-one-line .station-node:nth-child(even) .station-labels {
+        top: calc(200% + var(--one-label-offset));
+        bottom: auto;
+    }
+    .layout-one-line .station-node:nth-child(even) .transfer-badges {
+        bottom: calc(200% + var(--one-badge-offset));
+        top: auto;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .layout-one-line .station-name {
+        text-align: center;
+    }
+    .layout-one-line .station-name.en {
+        text-align: center;
+    }
+
+    .layout-one-line .line-row {
+        margin-bottom: 30px;
+    }
+
+    .layout-one-line .branch-row .station-node:nth-child(odd) .station-labels {
+        top: calc(200% + var(--one-label-offset));
+        bottom: auto;
+    }
+    .layout-one-line .branch-row .station-node:nth-child(odd) .transfer-badges {
+        bottom: calc(200% + var(--one-badge-offset));
+        top: auto;
+    }
+    .layout-one-line .branch-row .station-node:nth-child(even) .station-labels {
+        bottom: calc(200% + var(--one-label-offset));
+        top: auto;
+    }
+    .layout-one-line .branch-row .station-node:nth-child(even) .transfer-badges {
+        top: calc(200% + var(--one-badge-offset));
+        bottom: auto;
+    }
+
+    .layout-two-line .station-labels {
+        transform: rotate(var(--two-label-angle));
+        left: 50%;
+        bottom: calc(150% + var(--two-label-offset));
+        top: auto;
+        text-align: left;
+    }
+    .layout-two-line .transfer-badges {
+        left: 50%;
+        transform: translateX(-50%);
+        top: calc(200% + var(--two-badge-offset));
+        bottom: auto;
     }
     
     
@@ -397,6 +488,9 @@
         <script id="loop-has-terminal-data" type="application/json">{{ loop_has_terminal | tojson }}</script>
         <script id="loop-terminal-station-data" type="application/json">{{ loop_terminal_station | tojson }}</script>
         <script id="derection-data" type="application/json">{{ direction | tojson }}</script>
+    <script id="layout-mode-data" type="application/json">{{ layout_mode | tojson }}</script>
+    <script id="services-data" type="application/json">{{ services | tojson }}</script>
+        <script id="trans-data" type="application/json">{{ trans_data | tojson }}</script>
     </div>
 </div>
 
@@ -417,12 +511,13 @@ const nextStationName = JSON.parse(document.getElementById('next-station-data')?
 const isReversed = JSON.parse(document.getElementById('is-reversed-data')?.textContent || 'false');
 const isLoop = JSON.parse(document.getElementById('is-loop-data')?.textContent || 'false');
 const derection = parseInt(document.getElementById('derection-data')?.textContent || '0');
+const transData = JSON.parse(document.getElementById('trans-data')?.textContent || '{}');
 
 // 创建站点节点HTML
 function createStationNode(station) {
     const isNext = station.station_name === nextStationName;
     const isTransfer = station.is_transfer;
-    const isInactive = fullRouteMode && !currentRouteSet.has(station.station_name);
+    const isInactive = (fullRouteMode || window.isCustomBranchMode) && !currentRouteSet.has(station.station_name);
     
     return `
         <div class="station-node">
@@ -451,8 +546,9 @@ function calculateStationsPerRow() {
     // 更稳健的宽度测量，避免初次渲染方向切换导致的宽度偏差
     const containerWidth = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
     const stationWidth = 40; // 站点节点宽度
-    const stationSpacingMultiplier = parseFloat('{{ station_spacing_multiplier }}') || 1.0; // 获取倍数，默认为1.0
-    const gap = 25 * stationSpacingMultiplier; // 站点间距，乘以倍数
+    const layoutModeCalc = JSON.parse(document.getElementById('layout-mode-data')?.textContent || '"auto"');
+    const stationSpacingMultiplier = layoutModeCalc === 'auto' ? (parseFloat('{{ station_spacing_multiplier }}') || 1.0) : 1.0;
+    const gap = 25 * stationSpacingMultiplier;
     const margin = 40; // 边距
     
     const availableWidth = Math.max(0, containerWidth - margin * 2);
@@ -465,6 +561,7 @@ function calculateStationsPerRow() {
 // 创建Z字形布局
 function createZigzagLayout() {
     const metroLine = document.getElementById('metro-line');
+    const layoutMode = JSON.parse(document.getElementById('layout-mode-data')?.textContent || '"auto"');
     const stationsPerRow = calculateStationsPerRow();
 
     // 计算满行时的动态间距，用于给不满的行设置相同的间距
@@ -474,8 +571,8 @@ function createZigzagLayout() {
     const availableWidth = Math.max(0, containerWidth - margin * 2);
     const stationWidth = 40;
     // 如果只有1列，gap无意义；否则计算均匀分布后的实际gap
-    const stationSpacingMultiplier = parseFloat('{{ station_spacing_multiplier }}') || 1.0; // 获取倍数，默认为1.0
-    let dynamicGap = 25 * stationSpacingMultiplier; 
+    const stationSpacingMultiplierAuto = layoutMode === 'auto' ? (parseFloat('{{ station_spacing_multiplier }}') || 1.0) : 1.0;
+    let dynamicGap = 25 * stationSpacingMultiplierAuto; 
     if (stationsPerRow > 1) {
         dynamicGap = (availableWidth - stationsPerRow * stationWidth) / (stationsPerRow - 1);
     }
@@ -487,15 +584,239 @@ function createZigzagLayout() {
     // 清空现有内容
     metroLine.innerHTML = '';
     
-    // 如果站点数量少于每行容量，直接显示一行
-    if (lineInfo.length <= stationsPerRow) {
+    // 自定义布局：one_line 与 two_line
+    if (layoutMode === 'one_line') {
+        const servicesData = JSON.parse(document.getElementById('services-data')?.textContent || '[]');
+        let mainService = null;
+        let branchService = null;
+        if (servicesData && servicesData.length > 0) {
+             branchService = servicesData.find(s => s.branch);
+             if (branchService) {
+                 mainService = servicesData.find(s => (s.type === branchService.branch || s.service_name === branchService.branch));
+                 if (!mainService) {
+                     mainService = servicesData.find(s => s !== branchService);
+                 }
+             }
+        }
+
+        if (mainService && branchService) {
+            window.isCustomBranchMode = true; // 标记进入自定义分支模式
+
+            const mainStations = mainService.stations;
+            const branchStations = branchService.stations;
+            let forkIndex = -1;
+            const len = Math.min(mainStations.length, branchStations.length);
+            for (let i = 0; i < len; i++) {
+                if (mainStations[i] !== branchStations[i]) {
+                    break;
+                }
+                forkIndex = i;
+            }
+            
+            if (forkIndex >= 0 && forkIndex < mainStations.length - 1 && forkIndex < branchStations.length - 1) {
+                function getStationObj(name) {
+                    let s = lineInfo.find(s => s.station_name === name);
+                    if (s) return s;
+                    const isInactive = !currentRouteSet.has(name);
+                    return {
+                        station_name: name,
+                        station_name_en: s ? (s.station_en_name || s.station_name_en) : (transData[name] || name),
+                        is_transfer: false,
+                        transfer_lines: [],
+                        transfer_badges: []
+                    };
+                }
+                
+                const mainStationObjs = mainStations.map(getStationObj);
+                const branchStationObjs = branchStations.slice(forkIndex + 1).map(getStationObj);
+                
+                const rowMain = document.createElement('div');
+                rowMain.className = 'line-row';
+                rowMain.style.position = 'relative';
+                rowMain.dataset.branchMode = 'main';
+                rowMain.dataset.forkIndex = String(forkIndex);
+                rowMain.dataset.startIndex = '0';
+                rowMain.dataset.endIndex = String(mainStationObjs.length - 1);
+                rowMain.innerHTML = mainStationObjs.map(createStationNode).join('');
+                
+                const containerWidth2 = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
+                const availableWidth2 = Math.max(0, containerWidth2 - margin * 2);
+                const N = mainStationObjs.length;
+                let gap1 = N > 1 ? (availableWidth2 - N * stationWidth) / (N - 1) : 0;
+                gap1 = Math.max(8, gap1);
+                
+                const baseGap = 25;
+                const ratio = Math.max(0.6, Math.min(1.0, gap1 / baseGap));
+                metroLine.style.setProperty('--rail-thickness', Math.round(15 * ratio) + 'px');
+                metroLine.style.setProperty('--arrow-size', Math.round(25 * ratio) + 'px');
+                
+                rowMain.style.justifyContent = 'flex-start';
+                rowMain.style.gap = gap1 + 'px';
+                metroLine.appendChild(rowMain);
+                
+                const rowBranch = document.createElement('div');
+                rowBranch.className = 'line-row branch-row';
+                rowBranch.style.position = 'relative';
+                rowBranch.style.marginTop = '60px';
+                rowBranch.style.justifyContent = 'flex-start';
+                rowBranch.style.gap = gap1 + 'px';
+                
+                const offset = (stationWidth + gap1) * (forkIndex + 2);
+                rowBranch.style.paddingLeft = offset + 'px';
+                rowBranch.style.setProperty('--rail-left', offset*1.01 + 'px');
+                const branchRailWidth = (branchStationObjs.length * stationWidth + Math.max(0, branchStationObjs.length - 1) * gap1);
+                rowBranch.style.setProperty('--rail-width', branchRailWidth*0.7 + 'px');
+                
+                rowBranch.dataset.startIndex = String(forkIndex + 1);
+                rowBranch.dataset.endIndex = String(forkIndex + 1 + branchStationObjs.length - 1);
+                
+                // 检查分支是否激活
+                const isBranchActive = branchStationObjs.some(s => currentRouteSet.has(s.station_name));
+                if (!isBranchActive) {
+                    rowBranch.classList.add('inactive-row');
+                } else {
+                    // 如果分支激活，计算分支行的着色范围（Next Station -> End）
+                    // Find next station in branch row
+                    const branchNextIndex = branchStationObjs.findIndex(s => s.station_name === nextStationName);
+                    
+                    if (branchNextIndex >= 0) {
+                         // Next station is on Branch Row.
+                         // Color from Next -> End.
+                         const startIdx = branchNextIndex;
+                         const endIdx = branchStationObjs.length - 1;
+                         
+                         // Mark passed stations in branch row (0..Next-1)
+                         // Wait, we need to apply this AFTER adding to DOM? No, stations are not in DOM yet?
+                         // Ah, logic below handles creation.
+                         // We need to inject "passed" class into createStationNode or post-process.
+                         // Let's use post-process.
+                         
+                         // We'll add a data attribute to rowBranch to help computeRailAndConnectors logic?
+                         // Or we can just let standard logic handle it?
+                         // Standard logic: "if (globalNextIndex >= rowStart ...)"
+                         // But rowStart is just index offset.
+                         // Our branch row stations are not contiguous in lineInfo?
+                         // Actually they are mocked objects or real objects.
+                         // Standard logic relies on "row.dataset.startIndex".
+                         // In Branch Mode, we set startIndex/endIndex manually.
+                         // But `globalNextIndex` is based on `lineInfo` index.
+                         // If Branch Stations are NOT in `lineInfo` (or index mismatch), standard logic fails.
+                         // So we should implement Custom Coloring for Branch Row too, inside computeRailAndConnectors.
+                         rowBranch.dataset.branchMode = 'branch';
+                    } else {
+                         // Next station NOT in Branch Row.
+                         // If Next is in Main Row (before Fork), then Branch Row is FUTURE.
+                         // So Color Start -> End.
+                         // Check if Next is in Main Row (before Fork).
+                         // We can assume if Branch is Active, and Next is not in Branch, it's upstream.
+                         rowBranch.dataset.branchMode = 'branch';
+                    }
+                }
+                
+                rowBranch.innerHTML = branchStationObjs.map(createStationNode).join('');
+                metroLine.appendChild(rowBranch);
+                
+                // Post-process "passed" status for branch stations if needed (initial render)
+                // Actually computeRailAndConnectors is called on init/resize.
+                // So we should put logic there.
+                
+                requestAnimationFrame(() => {
+                    const forkStation = rowMain.children[forkIndex];
+                    const branchStartStation = rowBranch.children[0];
+                    if (forkStation && branchStartStation) {
+                        const rect1 = forkStation.getBoundingClientRect();
+                        const rect2 = branchStartStation.getBoundingClientRect();
+                        const containerRect = metroLine.getBoundingClientRect();
+                        
+                        const x1 = rect1.left + rect1.width / 2 - containerRect.left;
+                        const y1 = rect1.top + rect1.height / 2 - containerRect.top;
+                        const x2 = rect2.left + rect2.width / 2 - containerRect.left;
+                        const y2 = rect2.top + rect2.height / 2 - containerRect.top;
+                        
+                        const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+                        const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+                        
+                        const connector = document.createElement('div');
+                        connector.className = 'branch-connector';
+                        connector.style.position = 'absolute';
+                        connector.style.top = y1 + 'px';
+                        connector.style.left = x1 + 'px';
+                        connector.style.width = length + 'px';
+                        connector.style.height = '15px';
+                        connector.style.transformOrigin = '0 50%';
+                        connector.style.transform = `rotate(${angle}deg) translateY(-50%)`;
+                        connector.style.borderRadius = '8px';
+                        connector.style.zIndex = '0';
+                        
+                        const themeColor = getComputedStyle(metroLine).getPropertyValue('--theme-color').trim() || '#9b5de5';
+                        const isPassed = branchStartStation.querySelector('.station-circle').classList.contains('passed');
+                        
+                        if (isBranchActive && !isPassed) {
+                            connector.style.backgroundColor = themeColor;
+                        } else {
+                            connector.style.backgroundColor = '#ddd';
+                        }
+                        
+                        metroLine.appendChild(connector);
+                    }
+                });
+                
+                return;
+            }
+        }
+
         const row = document.createElement('div');
         row.className = 'line-row';
-        // 记录单行范围
         row.dataset.startIndex = '0';
         row.dataset.endIndex = String(lineInfo.length - 1);
         row.innerHTML = lineInfo.map(createStationNode).join('');
+        const containerWidth2 = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
+        const availableWidth2 = Math.max(0, containerWidth2 - margin * 2);
+        const N = lineInfo.length;
+        let gap1 = N > 1 ? (availableWidth2 - N * stationWidth) / (N - 1) : 0;
+        gap1 = Math.max(8, gap1);
+        const baseGap = 25;
+        const ratio = Math.max(0.6, Math.min(1.0, gap1 / baseGap));
+        metroLine.style.setProperty('--rail-thickness', Math.round(15 * ratio) + 'px');
+        metroLine.style.setProperty('--arrow-size', Math.round(25 * ratio) + 'px');
+        row.style.justifyContent = 'flex-start';
+        row.style.gap = gap1 + 'px';
         metroLine.appendChild(row);
+        return;
+    }
+    if (layoutMode === 'two_line') {
+        const topCount = Math.ceil(lineInfo.length / 2);
+        const bottomCount = Math.floor(lineInfo.length / 2);
+        const rowTop = document.createElement('div');
+        rowTop.className = 'line-row';
+        rowTop.dataset.startIndex = '0';
+        rowTop.dataset.endIndex = String(topCount - 1);
+        rowTop.innerHTML = lineInfo.slice(0, topCount).map(createStationNode).join('');
+        const containerWidth2 = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
+        const availableWidth2 = Math.max(0, containerWidth2 - margin * 2);
+        const N1 = topCount;
+        let gapTop = N1 > 1 ? (availableWidth2 - N1 * stationWidth) / (N1 - 1) : 0;
+        gapTop = Math.max(8, gapTop);
+        rowTop.style.justifyContent = 'flex-start';
+        rowTop.style.gap = gapTop + 'px';
+        metroLine.appendChild(rowTop);
+        if (bottomCount > 0) {
+            const rowBottom = document.createElement('div');
+            rowBottom.className = 'line-row reverse';
+            rowBottom.dataset.startIndex = String(topCount);
+            rowBottom.dataset.endIndex = String(lineInfo.length - 1);
+            rowBottom.innerHTML = lineInfo.slice(topCount).map(createStationNode).join('');
+            const N2 = bottomCount;
+            let gapBottom = N2 > 1 ? (availableWidth2 - N2 * stationWidth) / (N2 - 1) : 0;
+            gapBottom = Math.max(8, gapBottom);
+            rowBottom.style.justifyContent = 'flex-end';
+            rowBottom.style.gap = gapBottom + 'px';
+            const baseGap2 = 25;
+          const ratio2 = Math.max(0.6, Math.min(1.0, Math.min(gapTop, gapBottom) / baseGap2));
+          metroLine.style.setProperty('--rail-thickness', '15px'); // 保持固定宽度
+          metroLine.style.setProperty('--arrow-size', Math.round(25 * ratio2) + 'px');
+            metroLine.appendChild(rowBottom);
+        }
         return;
     }
     
@@ -541,11 +862,24 @@ function createZigzagLayout() {
     }
 }
 
+function applyCustomLayoutStyles() {
+    const layoutMode = JSON.parse(document.getElementById('layout-mode-data')?.textContent || '"auto"');
+    const isLoop = JSON.parse(document.getElementById('is-loop-data')?.textContent || 'false');
+    if (isLoop) return;
+    const metroLine = document.getElementById('metro-line');
+    metroLine.classList.remove('layout-one-line', 'layout-two-line');
+    if (layoutMode === 'one_line') {
+        metroLine.classList.add('layout-one-line');
+    } else if (layoutMode === 'two_line') {
+        metroLine.classList.add('layout-two-line');
+    }
+}
+
 // 计算轨道和连接线
 function computeRailAndConnectors() {
     const metroLine = document.getElementById('metro-line');
     const metroRect = metroLine.getBoundingClientRect();
-    const thickness = 15; // 轨道厚度，与CSS保持一致
+    const thickness = parseFloat(getComputedStyle(metroLine).getPropertyValue('--rail-thickness')) || 15;
     const metroWidth = Math.floor(metroRect.width || metroLine.clientWidth || metroLine.offsetWidth || 0);
 
     const rows = Array.from(document.querySelectorAll('.line-row'));
@@ -556,9 +890,250 @@ function computeRailAndConnectors() {
     
     // 先计算每行的轨道（灰色与彩色段）
     rows.forEach((row, rowIndex) => {
+        if (row.classList.contains('inactive-row')) return;
+
         const stations = Array.from(row.querySelectorAll('.station-node'));
         
         const rowLeft = row.getBoundingClientRect().left;
+
+        // Custom logic for branch mode 'main' row
+        if (row.dataset.branchMode === 'main') {
+            const firstRect = stations[0].getBoundingClientRect();
+            const lastRect = stations[stations.length - 1].getBoundingClientRect();
+            const firstCenterX = firstRect.left + firstRect.width / 2;
+            const lastCenterX = lastRect.left + lastRect.width / 2;
+            const railLeft = Math.min(firstCenterX, lastCenterX) - rowLeft;
+            const railWidth = Math.abs(lastCenterX - firstCenterX);
+            row.style.setProperty('--rail-left', Math.max(0, railLeft) + 'px');
+            row.style.setProperty('--rail-width', railWidth + 'px');
+
+            let coloredLeft = Math.max(0, railLeft);
+            let coloredWidth = 0;
+            const forkIndex = parseInt(row.dataset.forkIndex || '-1');
+            
+            // Find next station in this row
+            let nextStationInRowIndex = -1;
+            const nextStationName = JSON.parse(document.getElementById('next-station-data')?.textContent || 'null');
+            stations.forEach((s, i) => {
+                if (s.querySelector('.station-name').textContent === nextStationName) {
+                    nextStationInRowIndex = i;
+                }
+            });
+
+            // Logic Correction: "Passed segments should be Gray, Future segments should be Colored."
+            // We color from StartIndex (Next Station) to EndIndex (End of Active Route).
+            
+            let startColorIndex = -1;
+            let endColorIndex = -1;
+            
+            // Determine active range for this row
+            if (nextStationInRowIndex >= 0) {
+                // Next station is in this row (Main Row)
+                startColorIndex = nextStationInRowIndex;
+                endColorIndex = stations.length - 1; // Default to end of main row
+                
+                // If we are on branch route, main row coloring stops at fork
+                // (Unless next station is AFTER fork, but main row implies main route continuation?)
+                // Actually, if we are on branch route, the "Main Row" contains the fork.
+                // If Next Station is BEFORE Fork, then we color from Next to Fork.
+                // If Next Station is AFTER Fork, then we are on Main Route (implied), color to End.
+                
+                // Check if current route is Branch
+                const isBranchActive = document.querySelector('.branch-row') && !document.querySelector('.branch-row').classList.contains('inactive-row');
+                // Wait, logic: if branch is active, Main Row is only valid up to Fork?
+                // Actually, Main Row contains stations 0..N.
+                // Fork is at index F.
+                // If Route = Branch:
+                //   Stations 0..F are shared. F+1..N are Main-only.
+                //   If Next <= F: Color Next -> F. (And branch row handles F -> BranchEnd).
+                //   If Next > F: This implies we are NOT on Branch Route? (Or data error). Assume Main Route.
+                
+                if (isBranchActive && forkIndex >= 0) {
+                    if (startColorIndex <= forkIndex) {
+                        endColorIndex = forkIndex;
+                    } else {
+                        // Next is after fork, but branch is active? 
+                        // This means we are technically "off route" for the branch path, 
+                        // but if the user manually set Next Station on Main Loop while Branch is active...
+                        // Let's stick to: if Next <= Fork, color to Fork.
+                        // If Next > Fork, color to End (assuming dynamic switch).
+                    }
+                }
+            } else {
+                // Next station NOT in Main Row.
+                // Must be in Branch Row?
+                // If so, Main Row is "Passed" up to Fork?
+                // Or "Future" is on Branch Row.
+                // If Next is on Branch Row, then Main Row (0..Fork) is Passed -> Gray.
+                // So coloredWidth = 0 for Main Row?
+                // YES.
+                startColorIndex = -1; 
+            }
+            
+            // Mark passed stations (grey out)
+            if (nextStationInRowIndex >= 0) {
+                 stations.forEach((s, i) => {
+                     if (i < nextStationInRowIndex) {
+                         s.querySelector('.station-circle').classList.add('passed');
+                     }
+                 });
+            } else {
+                // Next station not in Main Row -> Likely on Branch Row
+                // So all stations up to Fork in Main Row are passed?
+                // If Next is on Branch, then yes, 0..Fork are passed.
+                // Check if Next is actually on Branch Row
+                const branchRow = document.querySelector('.branch-row');
+                if (branchRow) {
+                     const branchStations = Array.from(branchRow.querySelectorAll('.station-node'));
+                     const nextInBranch = branchStations.some(s => s.querySelector('.station-name').textContent === nextStationName);
+                     if (nextInBranch) {
+                         // We are on Branch. Main Row 0..Fork are passed.
+                         stations.forEach((s, i) => {
+                             if (i <= forkIndex) {
+                                 s.querySelector('.station-circle').classList.add('passed');
+                             }
+                         });
+                     }
+                }
+            }
+            
+            if (startColorIndex >= 0 && endColorIndex >= startColorIndex) {
+                const startRect = stations[startColorIndex].getBoundingClientRect();
+                const endRect = stations[endColorIndex].getBoundingClientRect();
+                const startCenterX = startRect.left + startRect.width / 2;
+                const endCenterX = endRect.left + endRect.width / 2;
+                coloredLeft = Math.min(startCenterX, endCenterX) - rowLeft;
+                coloredWidth = Math.abs(endCenterX - startCenterX);
+            }
+            
+            row.style.setProperty('--rail-colored-left', Math.max(0, coloredLeft) + 'px');
+            row.style.setProperty('--rail-colored-width', coloredWidth + 'px');
+            
+            const rowCenterY = row.getBoundingClientRect().height / 2;
+             for (let seg = 0; seg < stations.length - 1; seg++) {
+                 let colorClass = 'black'; // Future = Black/Theme
+                 
+                 // Passed = Gray
+                 if (nextStationInRowIndex >= 0) {
+                     if (seg < nextStationInRowIndex - 1) colorClass = 'gray'; // Before next station -> Passed
+                     else if (seg === nextStationInRowIndex - 1) colorClass = 'red'; // Approaching next
+                 } else {
+                     // Next not in row.
+                     // If on branch, 0..Fork are passed.
+                     if (seg < forkIndex) colorClass = 'gray';
+                     else {
+                         // Segments after fork on Main Row (when Next is on Branch)
+                         // These are Inactive Main Route segments.
+                         // Should probably be Gray or hidden arrows?
+                         // Let's make them black (default) but they sit on gray rail.
+                     }
+                 }
+                 
+                 // If segment is inactive (e.g. past fork on Main Row when Branch is active)
+                 // Or past fork on Branch Row when Main is active (handled by inactive-row)
+                 
+                 // Skip inactive segments arrows
+                 // if (seg >= forkIndex && nextStationInRowIndex < 0) continue; 
+                 
+                 const aRect = stations[seg].getBoundingClientRect();
+                 const bRect = stations[seg + 1].getBoundingClientRect();
+                 const aX = aRect.left + aRect.width / 2;
+                 const bX = bRect.left + bRect.width / 2;
+                 let midX = (aX + bX) / 2 - rowLeft;
+                 midX = Math.max(0, Math.min(row.getBoundingClientRect().width, midX));
+                 
+                 const arrow = document.createElement('div');
+                 arrow.className = 'direction-arrow ' + colorClass;
+                 arrow.textContent = '→';
+                 arrow.style.left = midX + 'px';
+                 arrow.style.top = rowCenterY + 'px';
+                 arrow.style.transform = 'translate(-50%, -50%)';
+                 row.appendChild(arrow);
+             }
+             return;
+        }
+
+        // Custom logic for branch mode 'branch' row
+        if (row.dataset.branchMode === 'branch') {
+             const firstRect = stations[0].getBoundingClientRect();
+             const lastRect = stations[stations.length - 1].getBoundingClientRect();
+             const firstCenterX = firstRect.left + firstRect.width / 2;
+             const lastCenterX = lastRect.left + lastRect.width / 2;
+             const railLeft = Math.min(firstCenterX, lastCenterX) - rowLeft;
+             const railWidth = Math.abs(lastCenterX - firstCenterX);
+             row.style.setProperty('--rail-left', Math.max(0, railLeft) + 'px');
+             row.style.setProperty('--rail-width', railWidth + 'px');
+             
+             // Find next station in this branch row
+             let nextStationInRowIndex = -1;
+             const nextStationName = JSON.parse(document.getElementById('next-station-data')?.textContent || 'null');
+             stations.forEach((s, i) => {
+                 if (s.querySelector('.station-name').textContent === nextStationName) {
+                     nextStationInRowIndex = i;
+                 }
+             });
+             
+             let coloredLeft = Math.max(0, railLeft);
+             let coloredWidth = 0;
+             let startColorIndex = -1;
+             
+             if (nextStationInRowIndex >= 0) {
+                 // Next is in this row. Color from Next -> End.
+                 startColorIndex = nextStationInRowIndex;
+                 // Mark passed
+                 stations.forEach((s, i) => {
+                     if (i < nextStationInRowIndex) {
+                         s.querySelector('.station-circle').classList.add('passed');
+                     }
+                 });
+             } else {
+                 // Next is NOT in this row.
+                 // Must be upstream (in Main Row before Fork).
+                 // So Branch Row is entirely Future -> Color Start -> End.
+                 startColorIndex = 0;
+             }
+             
+             if (startColorIndex >= 0) {
+                 const endColorIndex = stations.length - 1;
+                 const startRect = stations[startColorIndex].getBoundingClientRect();
+                 const endRect = stations[endColorIndex].getBoundingClientRect();
+                 const startCenterX = startRect.left + startRect.width / 2;
+                 const endCenterX = endRect.left + endRect.width / 2;
+                 coloredLeft = Math.min(startCenterX, endCenterX) - rowLeft;
+                 coloredWidth = Math.abs(endCenterX - startCenterX);
+             }
+             
+             row.style.setProperty('--rail-colored-left', Math.max(0, coloredLeft) + 'px');
+             row.style.setProperty('--rail-colored-width', coloredWidth + 'px');
+             
+             const rowCenterY = row.getBoundingClientRect().height / 2;
+             for (let seg = 0; seg < stations.length - 1; seg++) {
+                 let colorClass = 'black';
+                 if (nextStationInRowIndex >= 0) {
+                     if (seg < nextStationInRowIndex - 1) colorClass = 'gray';
+                     else if (seg === nextStationInRowIndex - 1) colorClass = 'red';
+                 } else {
+                     // Entire row is future
+                     colorClass = 'black';
+                 }
+                 
+                 const aRect = stations[seg].getBoundingClientRect();
+                 const bRect = stations[seg + 1].getBoundingClientRect();
+                 const aX = aRect.left + aRect.width / 2;
+                 const bX = bRect.left + bRect.width / 2;
+                 let midX = (aX + bX) / 2 - rowLeft;
+                 midX = Math.max(0, Math.min(row.getBoundingClientRect().width, midX));
+                 
+                 const arrow = document.createElement('div');
+                 arrow.className = 'direction-arrow ' + colorClass;
+                 arrow.textContent = '→';
+                 arrow.style.left = midX + 'px';
+                 arrow.style.top = rowCenterY + 'px';
+                 arrow.style.transform = 'translate(-50%, -50%)';
+                 row.appendChild(arrow);
+             }
+             return;
+        }
         
         if (stations.length < 2) {
             // 单站点行：不显示轨道
@@ -731,6 +1306,9 @@ function computeRailAndConnectors() {
 
     // 再绘制每两行之间的平滑垂直连接
     for (let i = 0; i < rows.length - 1; i++) {
+        // 在自定义分支模式下，不绘制默认的行间垂直连接线（改由 branch-connector 绘制斜线）
+        if (window.isCustomBranchMode) continue;
+        
         const upper = rows[i];
         const lower = rows[i + 1];
         const upperStations = Array.from(upper.querySelectorAll('.station-node'));
@@ -790,7 +1368,7 @@ function computeRailAndConnectors() {
         const yLowerR = Math.round(yLower);
         let xOutR = Math.round(xOut);
         // 左边界保护，避免大外移或方向切换导致的负值
-        const xOutRClamped = Math.max(thickness / 2, Math.min(metroWidth - thickness / 2, xOutR));
+        const xOutRClamped = xOutR;
         
         // 顶部水平过渡段：从行端到外移位置（在圆弧帽下方额外延伸半个厚度以避免缝隙）
         const hTop = document.createElement('div');
@@ -910,14 +1488,55 @@ function computeRailAndConnectors() {
 
 
 // 设定徽章背景色
-function setTransferBadgeColors() {
-    document.querySelectorAll('.transfer-badge[data-color]').forEach(el => {
-        const c = el.getAttribute('data-color');
-        if (c) el.style.backgroundColor = c;
-    });
-}
+    function setTransferBadgeColors() {
+        document.querySelectorAll('.transfer-badge[data-color]').forEach(el => {
+            const c = el.getAttribute('data-color');
+            if (c) el.style.backgroundColor = c;
+        });
+    }
 
-// 为换乘站创建旋转多色环
+    // Custom Logic to handle Diagonal Connector Color (Passed vs Future)
+    if (window.isCustomBranchMode) {
+        const connector = document.querySelector('.branch-connector');
+        if (connector) {
+             const branchRow = document.querySelector('.branch-row');
+             const nextStationName = JSON.parse(document.getElementById('next-station-data')?.textContent || 'null');
+             let isConnectorPassed = false;
+             
+             // If Next Station is on Branch Row (or beyond it), connector is Passed.
+             // If Next Station is on Main Row (before Fork), connector is Future.
+             // If Next Station is on Main Row (after Fork), connector is Inactive (handled by inactive-row check in creation).
+             
+             if (branchRow) {
+                 const branchStations = Array.from(branchRow.querySelectorAll('.station-node'));
+                 const nextInBranch = branchStations.some(s => s.querySelector('.station-name').textContent === nextStationName);
+                 if (nextInBranch) {
+                     isConnectorPassed = true;
+                     // Exception: If Next is the FIRST station of Branch, connector is technically "Current" segment (Red?) or "Future" relative to Fork?
+                     // Usually connector is part of the segment leading TO the first station.
+                     // If Next is 1st station, segment leading to it is Active (Red/Theme).
+                     // If Next is 2nd station, segment leading to 1st is Passed (Gray).
+                     
+                     const nextIndex = branchStations.findIndex(s => s.querySelector('.station-name').textContent === nextStationName);
+                     if (nextIndex === 0) {
+                         isConnectorPassed = false; // It's the active segment approaching Next
+                     }
+                 }
+             }
+             
+             // Re-evaluate color based on Passed/Future logic
+             const themeColor = getComputedStyle(document.getElementById('metro-line')).getPropertyValue('--theme-color').trim() || '#9b5de5';
+             if (connector.style.backgroundColor !== 'rgb(221, 221, 221)' && connector.style.backgroundColor !== '#ddd') { // Only if active
+                 if (isConnectorPassed) {
+                     connector.style.backgroundColor = '#cfcfcf'; // Passed -> Gray
+                 } else {
+                     connector.style.backgroundColor = themeColor; // Future -> Theme
+                 }
+             }
+        }
+    }
+
+    // 为换乘站创建旋转多色环
 function createTransferRings() {
     document.querySelectorAll('.station-node').forEach(node => {
         const circle = node.querySelector('.station-circle.transfer');
@@ -976,6 +1595,7 @@ function handleResize() {
         renderLoopMap();
     } else {
         createZigzagLayout();
+        applyCustomLayoutStyles();
         computeRailAndConnectors();
         setTransferBadgeColors();
         createTransferRings();
@@ -990,6 +1610,7 @@ function init() {
         window.addEventListener('resize', handleResize);
     } else {
         createZigzagLayout();
+        applyCustomLayoutStyles();
         computeRailAndConnectors();
         setTransferBadgeColors();
         createTransferRings();
@@ -1003,6 +1624,7 @@ function init() {
                 setTimeout(() => {
                     metroLine.dataset.settle = 'done';
                     createZigzagLayout();
+                    applyCustomLayoutStyles();
                     computeRailAndConnectors();
                     setTransferBadgeColors();
                     createTransferRings();
@@ -1142,7 +1764,7 @@ function renderLoopMap() {
             if (badges) {
                 badges.style.top = '50%';
                 badges.style.bottom = 'auto';
-                badges.style.left = '30px'; // 距离左边界38px
+                badges.style.left = '10px'; // 距离左边界38px
                 badges.style.right = 'auto';
                 badges.style.transform = 'translateY(-50%)';
                 badges.style.flexDirection = 'row';
@@ -1157,7 +1779,7 @@ function renderLoopMap() {
                 badges.style.top = '50%';
                 badges.style.bottom = 'auto';
                 badges.style.left = 'auto';
-                badges.style.right = '30px'; 
+                badges.style.right = '10px'; 
                 badges.style.transform = 'translateY(-50%)';
                 badges.style.flexDirection = 'row';
                 badges.style.gap = '2px';
@@ -1230,8 +1852,27 @@ function renderLoopMap() {
         // 站点灰显列表
         let passedIndices = [];
         let startIdxForArc = -1;
-        if (hasTerminal && terminalIdxU >= 0) {
-            // 有终点站：从终点站到下一站（不含下一站）之间标记为已过
+        let L = 0; // 灰线长度
+        let shouldDrawGrayLine = false; // 是否绘制灰线
+
+        // 判断下一站是否为终点站
+        const isNextStationTerminal = (hasTerminal && nextIdxU === terminalIdxU);
+
+        if (isNextStationTerminal) {
+            // 如果下一站就是终点站，则除了下一站本身，所有其他站点都视为已过站
+            for (let i = 0; i < nU; i++) {
+                if (i !== nextIdxU) {
+                    passedIndices.push(i);
+                }
+            }
+
+            // 当下一站是终点站时，所有路线段都应为灰色
+            L = totalLen; // 灰线长度等于总长度
+            startArcPos = dPos[nextIdxU]; // 灰线起始位置可以任意设置，这里选择下一站的位置
+            shouldDrawGrayLine = true;
+
+        } else if (hasTerminal && terminalIdxU >= 0) {
+            // 有终点站，且下一站不是终点站：从终点站到下一站（不含下一站）之间标记为已过
             let i = terminalIdxU;
             startIdxForArc = terminalIdxU;
             while (i !== nextIdxU) {
@@ -1240,11 +1881,34 @@ function renderLoopMap() {
                 }
                 i = stepNext(i);
             }
+            // 计算灰线长度和起始位置
+            const startD = dPos[startIdxForArc];
+            const endD = dPos[nextIdxU];
+            if (derection === 0) {
+                L = (startD - endD + totalLen) % totalLen;
+                startArcPos = endD;
+            } else {
+                L = (endD - startD + totalLen) % totalLen;
+                startArcPos = startD;
+            }
+            shouldDrawGrayLine = true;
+
         } else {
             // 无终点站：仅上一站标记为已过，灰线覆盖上一站到下一站之间的段
             const prevIdxU = stepPrev(nextIdxU);
             passedIndices.push(prevIdxU);
             startIdxForArc = prevIdxU;
+            // 计算灰线长度和起始位置
+            const startD = dPos[startIdxForArc];
+            const endD = dPos[nextIdxU];
+            if (derection === 0) {
+                L = (startD - endD + totalLen) % totalLen;
+                startArcPos = endD;
+            } else {
+                L = (endD - startD + totalLen) % totalLen;
+                startArcPos = startD;
+            }
+            shouldDrawGrayLine = true;
         }
 
         // 标记站点为已过（灰、静止）
@@ -1253,38 +1917,24 @@ function renderLoopMap() {
             if (circle) circle.classList.add('passed');
         });
 
-        // 绘制灰色已过线段：从起点到下一站的路径段（按路径增长方向从 endD 到 startD）
-        if (startIdxForArc >= 0 && startIdxForArc !== nextIdxU) {
-            const startD = dPos[startIdxForArc];
-            const endD = dPos[nextIdxU];
-            let L, startArcPos;
-            if (derection === 0) {
-                // 逆时针：沿站序 i+1 前进，d 随前进减小；灰段应从 endD 起，长度为 startD->endD 的差值
-                L = (startD - endD + totalLen) % totalLen;
-                startArcPos = endD;
-            } else {
-                // 顺时针：沿站序 i-1 前进，d 随前进增大；灰段应从 startD 起，长度为 startD->endD 的差值
-                L = (endD - startD + totalLen) % totalLen;
-                startArcPos = startD;
-            }
-            if (L > 0) {
-                 const passedStroke = document.createElementNS(ns, 'rect');
-                 passedStroke.setAttribute('x', String(margin));
-                 passedStroke.setAttribute('y', String(margin));
-                 passedStroke.setAttribute('width', String(W));
-                 passedStroke.setAttribute('height', String(H));
-                 passedStroke.setAttribute('rx', String(radius));
-                 passedStroke.setAttribute('ry', String(radius));
-                 passedStroke.setAttribute('fill', 'none');
-                 passedStroke.setAttribute('stroke', '#cfcfcf');
-                 passedStroke.setAttribute('stroke-width', '15');
-                 passedStroke.setAttribute('stroke-linecap', 'butt');
-                 // 单段灰：灰段长度 L，剩余为透明（总长 - L）
-                 passedStroke.setAttribute('stroke-dasharray', `${L} ${totalLen - L}`);
-                 // 从正确的起点开始绘制（随方向）
-                 passedStroke.setAttribute('stroke-dashoffset', String((totalLen - startArcPos) % totalLen));
-                 svg.appendChild(passedStroke);
-             }
+        // 绘制灰色已过线段
+        if (shouldDrawGrayLine && L > 0) {
+            const passedStroke = document.createElementNS(ns, 'rect');
+            passedStroke.setAttribute('x', String(margin));
+            passedStroke.setAttribute('y', String(margin));
+            passedStroke.setAttribute('width', String(W));
+            passedStroke.setAttribute('height', String(H));
+            passedStroke.setAttribute('rx', String(radius));
+            passedStroke.setAttribute('ry', String(radius));
+            passedStroke.setAttribute('fill', 'none');
+            passedStroke.setAttribute('stroke', '#cfcfcf');
+            passedStroke.setAttribute('stroke-width', '15');
+            passedStroke.setAttribute('stroke-linecap', 'butt');
+            // 单段灰：灰段长度 L，剩余为透明（总长 - L）
+            passedStroke.setAttribute('stroke-dasharray', `${L} ${totalLen - L}`);
+            // 从正确的起点开始绘制（随方向）
+            passedStroke.setAttribute('stroke-dashoffset', String((totalLen - startArcPos) % totalLen));
+            svg.appendChild(passedStroke);
         }
     })();
 

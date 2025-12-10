@@ -2,6 +2,8 @@
   "line_1": {
     "line_name": "1号线-Line 1",
     "type": "linear",
+    "layout": "one_line",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "type": "route1",
@@ -11,6 +13,7 @@
       },
       {
         "type": "route2",
+        "branch": "route1",
         "stations": [
           "韦家碾", "升仙湖", "火车北站", "人民北路", "文殊院", "骡马市", "天府广场", "锦江宾馆", "华西坝", "省体育馆", "倪家桥", "桐梓林", "火车南站", "高新", "金融城", "孵化园", "锦城广场", "世纪城", "天府三街", "天府五街", "华府大道", "四河", "广都", "五根松"
         ]
@@ -20,6 +23,8 @@
   "line_2": {
     "line_name": "2号线-Line 2",
     "type": "linear",
+    "layout": "two_line",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "type": "route1",
@@ -38,6 +43,8 @@
   "line_3": {
     "line_name": "3号线-Line 3",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "type": "route1",
@@ -56,6 +63,8 @@
   "line_4": {
     "line_name": "4号线-Line 4",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "type": "route1",
@@ -74,6 +83,8 @@
   "line_5": {
     "line_name": "5号线-Line 5",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "type": "route1",
@@ -92,6 +103,8 @@
   "line_6": {
     "line_name": "6号线-Line 6",
     "type": "linear_multi_service",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -115,7 +128,9 @@
   },
   "line_7": {
     "line_name": "7号线-Line 7",
+    "layout": "auto",
     "type": "loop",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -135,7 +150,9 @@
   },
   "line_8": {
     "line_name": "8号线-Line 8",
+    "layout": "auto",
     "type": "linear",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -148,6 +165,8 @@
   "line_9": {
     "line_name": "9号线-Line 9",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -160,6 +179,8 @@
   "line_10": {
     "line_name": "10号线-Line 10",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -178,6 +199,8 @@
   "line_13": {
     "line_name": "13号线-Line 13",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -190,6 +213,8 @@
   "line_17": {
     "line_name": "17号线-Line 17",
     "type": "linear",
+    "layout": "one_line",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -208,6 +233,8 @@
   "line_18": {
     "line_name": "18号线-Line 18",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -232,6 +259,8 @@
   "line_19": {
     "line_name": "19号线-Line 19",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -256,6 +285,8 @@
   "line_27": {
     "line_name": "27号线-Line 27",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -274,6 +305,8 @@
   "line_30": {
     "line_name": "30号线-Line 30",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -286,6 +319,8 @@
   "line_S3": {
     "line_name": "S3线(资阳线)-Line S3",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",

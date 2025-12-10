@@ -2,6 +2,8 @@
   "line_环": {
     "line_name": "环线-Loop Line",
     "type": "loop",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -15,6 +17,8 @@
   "line_1": {
     "line_name": "1号线-Line 1",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -27,6 +31,8 @@
   "line_2": {
     "line_name": "2号线-Line 2",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -45,6 +51,8 @@
   "line_3": {
     "line_name": "3号线-Line 3",
     "type": "linear_multi_service",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -68,7 +76,9 @@
   },
   "line_空港": {
     "line_name": "空港线-Line 3 Konggang",
+    "layout": "auto",
     "type": "linear",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -81,6 +91,8 @@
   "line_4": {
     "line_name": "4号线",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -93,6 +105,8 @@
   "line_5": {
     "line_name": "5号线-Line 5",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -111,6 +125,8 @@
   "line_江跳": {
     "line_name": "江跳线",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -129,6 +145,8 @@
   "line_6": {
     "line_name": "6号线-Line 6",
     "type": "linear_multi_service",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -153,6 +171,8 @@
   "line_国博": {
     "line_name": "国博线-Line 6 Guobo",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -165,6 +185,8 @@
   "line_9": {
     "line_name": "9号线-Line 9",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -183,6 +205,8 @@
   "line_10": {
     "line_name": "10号线-Line 10",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -201,6 +225,8 @@
   "line_18": {
     "line_name": "18号线-Line 18",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -213,6 +239,8 @@
   "line_璧铜": {
     "line_name": "璧铜线-Line 18 Bitong",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
@@ -225,6 +253,8 @@
   "line_4_0_5_express": {
     "line_name": "直快列车-Express",
     "type": "linear",
+    "layout": "auto",
+    "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",

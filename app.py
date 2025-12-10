@@ -82,13 +82,12 @@ except Exception as e:
 
 # 模拟当前状态数据
 current_state = {
-    'line_name': 'line_3',
+    'line_name': 'line_13',
     'route_name': 'route1',
-    'next_station': '四公里',
-    'direction':1, # 方向：0与数据文件顺序一致，1为反向（显示反转）
+    'next_station': '幸福梅林',
+    'direction':0, # 方向：0与数据文件顺序一致，1为反向（显示反转）
     'door_side': '本侧',  # 本侧或对侧
-    'current_carriage': 3,
-    'station_spacing_multiplier': 1 # 站点间距倍数，大于1
+    'current_carriage': 3
 }
 
 
@@ -566,6 +565,36 @@ def line_map():
             except Exception:
                 pass
 
+        # 布局模式（非环线有效；环线强制为auto）
+        layout_mode = 'auto'
+        try:
+            route_data = _get_route_data()
+            d = route_data.get(line_name, {})
+            layout_mode = (d.get('layout') or 'auto')
+            if is_loop:
+                layout_mode = 'auto'
+        except Exception:
+            layout_mode = 'auto'
+
+        station_spacing_multiplier = 1.0
+        try:
+            route_data = _get_route_data()
+            d = route_data.get(line_name, {})
+            m = d.get('station_spacing_multiplier')
+            if m is not None:
+                station_spacing_multiplier = float(m)
+        except Exception:
+            station_spacing_multiplier = 1.0
+
+        # 获取 services 信息用于前端分支渲染
+        services_data = []
+        try:
+            route_data = _get_route_data()
+            d = route_data.get(line_name, {})
+            services_data = d.get('services', [])
+        except Exception:
+            services_data = []
+
         return render_template('line_map.html', 
                                 line_info=line_info,
                                 line_display_name=line_display_name,
@@ -579,6 +608,9 @@ def line_map():
                                 full_route_mode=full_route_mode,
                                 trans_data=trans_data,
                                 transfer_badges=transfer_badges,
+                                layout_mode=layout_mode,
+                                station_spacing_multiplier=station_spacing_multiplier,
+                                services=services_data,
                                 config=app_config,
                                 **current_state)
     except Exception as e:
