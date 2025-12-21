@@ -57,7 +57,7 @@
   "line_4": {
     "line_name": "4号线-Line 4",
     "type": "linear",
-    "layout": "auto",
+    "layout": "two_line",
     "station_spacing_multiplier": 1,
     "services": [
       {
