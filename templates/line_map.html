@@ -152,6 +152,7 @@
         position: absolute;
         top: 50%;
         left: var(--rail-left, 0);
+        right: var(--rail-right, auto);
         width: var(--rail-width, 100%);
         height: 15px;
         background-color: #ddd;
@@ -165,6 +166,7 @@
         position: absolute;
         top: 50%;
         left: var(--rail-colored-left, var(--rail-left, 0));
+        right: var(--rail-colored-right, var(--rail-right, auto));
         width: var(--rail-colored-width, 0);
         height: 15px;
         background-color: var(--theme-color);
@@ -487,7 +489,7 @@
         <script id="is-loop-data" type="application/json">{{ is_loop | tojson }}</script>
         <script id="loop-has-terminal-data" type="application/json">{{ loop_has_terminal | tojson }}</script>
         <script id="loop-terminal-station-data" type="application/json">{{ loop_terminal_station | tojson }}</script>
-        <script id="derection-data" type="application/json">{{ direction | tojson }}</script>
+        <script id="direction-data" type="application/json">{{ direction | tojson }}</script>
     <script id="layout-mode-data" type="application/json">{{ layout_mode | tojson }}</script>
     <script id="services-data" type="application/json">{{ services | tojson }}</script>
         <script id="trans-data" type="application/json">{{ trans_data | tojson }}</script>
@@ -510,7 +512,7 @@ const currentRouteSet = new Set(currentRouteStations);
 const nextStationName = JSON.parse(document.getElementById('next-station-data')?.textContent || 'null');
 const isReversed = JSON.parse(document.getElementById('is-reversed-data')?.textContent || 'false');
 const isLoop = JSON.parse(document.getElementById('is-loop-data')?.textContent || 'false');
-const derection = parseInt(document.getElementById('derection-data')?.textContent || '0');
+const derection = parseInt(document.getElementById('direction-data')?.textContent || '0');
 const transData = JSON.parse(document.getElementById('trans-data')?.textContent || '{}');
 
 // 创建站点节点HTML
@@ -626,14 +628,19 @@ function createZigzagLayout() {
                         transfer_badges: []
                     };
                 }
-                
-                const mainStationObjs = mainStations.map(getStationObj);
-                const branchStationObjs = branchStations.slice(forkIndex + 1).map(getStationObj);
+                const isDirReverse = derection === 1;
+                const forkIndexOrig = forkIndex;
+                const mainStationObjs = (isDirReverse ? mainStations.slice().reverse().map(getStationObj) : mainStations.map(getStationObj));
+                const branchStationObjs = branchStations.slice(forkIndexOrig + 1).map(getStationObj);
                 
                 const rowMain = document.createElement('div');
                 rowMain.className = 'line-row';
                 rowMain.style.position = 'relative';
                 rowMain.dataset.branchMode = 'main';
+                const N = mainStationObjs.length;
+                if (isDirReverse) {
+                    forkIndex = N - 1 - forkIndexOrig;
+                }
                 rowMain.dataset.forkIndex = String(forkIndex);
                 rowMain.dataset.startIndex = '0';
                 rowMain.dataset.endIndex = String(mainStationObjs.length - 1);
@@ -641,7 +648,6 @@ function createZigzagLayout() {
                 
                 const containerWidth2 = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
                 const availableWidth2 = Math.max(0, containerWidth2 - margin * 2);
-                const N = mainStationObjs.length;
                 let gap1 = N > 1 ? (availableWidth2 - N * stationWidth) / (N - 1) : 0;
                 gap1 = Math.max(8, gap1);
                 
@@ -655,20 +661,33 @@ function createZigzagLayout() {
                 metroLine.appendChild(rowMain);
                 
                 const rowBranch = document.createElement('div');
-                rowBranch.className = 'line-row branch-row';
+                rowBranch.className = 'line-row branch-row' + (isDirReverse ? ' reverse' : '');
                 rowBranch.style.position = 'relative';
                 rowBranch.style.marginTop = '60px';
                 rowBranch.style.justifyContent = 'flex-start';
                 rowBranch.style.gap = gap1 + 'px';
                 
-                const offset = (stationWidth + gap1) * (forkIndex + 2);
-                rowBranch.style.paddingLeft = offset + 'px';
-                rowBranch.style.setProperty('--rail-left', offset*1.01 + 'px');
+                const offset = (stationWidth + gap1) * (forkIndexOrig + 2);
                 const branchRailWidth = (branchStationObjs.length * stationWidth + Math.max(0, branchStationObjs.length - 1) * gap1);
+                
+                if (isDirReverse) {
+                    // Reverse Mode: Align Right (flex-start in row-reverse), Push Left by offset
+                    rowBranch.style.paddingRight = offset + 'px';
+                    rowBranch.style.paddingLeft = '0';
+                    rowBranch.style.setProperty('--rail-left', 'auto');
+                    rowBranch.style.setProperty('--rail-right', offset*1.01 + 'px');
+                } else {
+                    // Normal Mode: Align Left, Push Right by offset
+                    rowBranch.style.paddingLeft = offset + 'px';
+                    rowBranch.style.paddingRight = '0';
+                    rowBranch.style.setProperty('--rail-left', offset*1.01 + 'px');
+                    rowBranch.style.setProperty('--rail-right', 'auto');
+                }
+                
                 rowBranch.style.setProperty('--rail-width', branchRailWidth*0.7 + 'px');
                 
-                rowBranch.dataset.startIndex = String(forkIndex + 1);
-                rowBranch.dataset.endIndex = String(forkIndex + 1 + branchStationObjs.length - 1);
+                rowBranch.dataset.startIndex = String(forkIndexOrig + 1);
+                rowBranch.dataset.endIndex = String(forkIndexOrig + 1 + branchStationObjs.length - 1);
                 
                 // 检查分支是否激活
                 const isBranchActive = branchStationObjs.some(s => currentRouteSet.has(s.station_name));
@@ -750,12 +769,16 @@ function createZigzagLayout() {
                         
                         const themeColor = getComputedStyle(metroLine).getPropertyValue('--theme-color').trim() || '#9b5de5';
                         const isPassed = branchStartStation.querySelector('.station-circle').classList.contains('passed');
-                        
-                        if (isBranchActive && !isPassed) {
-                            connector.style.backgroundColor = themeColor;
-                        } else {
-                            connector.style.backgroundColor = '#ddd';
+                        const branchStationsNow = Array.from(rowBranch.querySelectorAll('.station-node'));
+                        const nextInBranchIdx = branchStationsNow.findIndex(s => s.querySelector('.station-name').textContent === nextStationName);
+                        let toColor = false;
+                        if (nextInBranchIdx >= 0) {
+                            const direction = parseInt(document.getElementById('direction-data')?.textContent || '0');
+                            toColor = (direction === 1);
+                        } else if (isBranchActive && !isPassed) {
+                            toColor = true;
                         }
+                        connector.style.backgroundColor = toColor ? themeColor : '#ddd';
                         
                         metroLine.appendChild(connector);
                     }
@@ -769,7 +792,8 @@ function createZigzagLayout() {
         row.className = 'line-row';
         row.dataset.startIndex = '0';
         row.dataset.endIndex = String(lineInfo.length - 1);
-        row.innerHTML = lineInfo.map(createStationNode).join('');
+        const oneLineStations = derection === 1 ? lineInfo.slice().reverse() : lineInfo;
+        row.innerHTML = oneLineStations.map(createStationNode).join('');
         const containerWidth2 = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
         const availableWidth2 = Math.max(0, containerWidth2 - margin * 2);
         const N = lineInfo.length;
@@ -928,49 +952,85 @@ function computeRailAndConnectors() {
             
             // Determine active range for this row
             if (nextStationInRowIndex >= 0) {
-                // Next station is in this row (Main Row)
+                // Next station is in this row (Main Row or Branch Row)
                 startColorIndex = nextStationInRowIndex;
-                endColorIndex = stations.length - 1; // Default to end of main row
-                
-                // If we are on branch route, main row coloring stops at fork
-                // (Unless next station is AFTER fork, but main row implies main route continuation?)
-                // Actually, if we are on branch route, the "Main Row" contains the fork.
-                // If Next Station is BEFORE Fork, then we color from Next to Fork.
-                // If Next Station is AFTER Fork, then we are on Main Route (implied), color to End.
-                
-                // Check if current route is Branch
-                const isBranchActive = document.querySelector('.branch-row') && !document.querySelector('.branch-row').classList.contains('inactive-row');
-                // Wait, logic: if branch is active, Main Row is only valid up to Fork?
-                // Actually, Main Row contains stations 0..N.
-                // Fork is at index F.
-                // If Route = Branch:
-                //   Stations 0..F are shared. F+1..N are Main-only.
-                //   If Next <= F: Color Next -> F. (And branch row handles F -> BranchEnd).
-                //   If Next > F: This implies we are NOT on Branch Route? (Or data error). Assume Main Route.
+                endColorIndex = stations.length - 1; 
+
+                // Check if branch is active and we are in Main Row
+                // If branch is active, Main Row extension (Fork..End) should be inactive IF Next is before Fork.
+                const branchRow = document.querySelector('.branch-row');
+                const isBranchActive = branchRow && !branchRow.classList.contains('inactive-row');
                 
                 if (isBranchActive && forkIndex >= 0) {
-                    if (startColorIndex <= forkIndex) {
+                    // We are in Main Row, Branch is Active.
+                    // If Next Station is BEFORE or AT Fork, the Main Extension (Fork..End) is NOT the active path.
+                    // The active path goes to Branch.
+                    if (nextStationInRowIndex <= forkIndex) {
                         endColorIndex = forkIndex;
-                    } else {
-                        // Next is after fork, but branch is active? 
-                        // This means we are technically "off route" for the branch path, 
-                        // but if the user manually set Next Station on Main Loop while Branch is active...
-                        // Let's stick to: if Next <= Fork, color to Fork.
-                        // If Next > Fork, color to End (assuming dynamic switch).
                     }
                 }
             } else {
-                // Next station NOT in Main Row.
-                // Must be in Branch Row?
-                // If so, Main Row is "Passed" up to Fork?
-                // Or "Future" is on Branch Row.
-                // If Next is on Branch Row, then Main Row (0..Fork) is Passed -> Gray.
-                // So coloredWidth = 0 for Main Row?
-                // YES.
-                startColorIndex = -1; 
+                // Next station NOT in this row.
+                if (row.classList.contains('branch-row')) {
+                    // We are in Branch Row. Next is likely in Main Row.
+                    // Check if Next is effectively "after" the branch (meaning Branch is Passed).
+                    // Or "before" the branch (meaning Branch is Future).
+                    const mainRow = document.querySelector('.line-row:not(.branch-row)');
+                    if (mainRow) {
+                        const forkIdx = parseInt(mainRow.dataset.forkIndex || '-1');
+                        const mainStations = Array.from(mainRow.querySelectorAll('.station-node'));
+                        const nextInMainIdx = mainStations.findIndex(s => s.querySelector('.station-name').textContent === nextStationName);
+                        
+                        if (nextInMainIdx >= 0) {
+                            if (nextInMainIdx > forkIdx) {
+                                // Next is after Fork on Main Line.
+                                // Branch is Passed (or Skipped).
+                                // Mark all branch stations as passed.
+                                stations.forEach(s => s.querySelector('.station-circle').classList.add('passed'));
+                                startColorIndex = -1; // No color
+                            } else {
+                                // Next is before Fork. Branch is Future.
+                                startColorIndex = 0;
+                                endColorIndex = stations.length - 1;
+                            }
+                        }
+                    }
+                } else {
+                    // We are in Main Row. Next is likely in Branch Row.
+                    const branchRow = document.querySelector('.branch-row');
+                    if (branchRow) {
+                         const branchStations = Array.from(branchRow.querySelectorAll('.station-node'));
+                         const nextInBranch = branchStations.some(s => s.querySelector('.station-name').textContent === nextStationName);
+                         if (nextInBranch) {
+                             // Next is on Branch.
+                             const direction = parseInt(document.getElementById('direction-data')?.textContent || '0');
+                             
+                             if (direction === 1) {
+                                 // Reverse: Branch -> Fork -> Main(0..Fork).
+                                 // Main(0..Fork) is Future (Active).
+                                 startColorIndex = forkIndex;
+                                 endColorIndex = 0;
+                                 // Do NOT mark as passed.
+                             } else {
+                                 // Forward: Main(0..Fork) -> Branch.
+                                 // Main(0..Fork) is Passed.
+                                 // Main Row Fork..End are Inactive (Gray).
+                                 startColorIndex = -1; // No colored rail for the main row after fork
+                                 endColorIndex = -1;
+                                 
+                                 // Mark 0..Fork as passed
+                                 stations.forEach((s, i) => {
+                                     if (i <= forkIndex) {
+                                         s.querySelector('.station-circle').classList.add('passed');
+                                     }
+                                 });
+                             }
+                         }
+                    }
+                }
             }
             
-            // Mark passed stations (grey out)
+            // Mark passed stations (grey out) for current row if next is present
             if (nextStationInRowIndex >= 0) {
                  stations.forEach((s, i) => {
                      if (i < nextStationInRowIndex) {
@@ -978,28 +1038,14 @@ function computeRailAndConnectors() {
                      }
                  });
             } else {
-                // Next station not in Main Row -> Likely on Branch Row
-                // So all stations up to Fork in Main Row are passed?
-                // If Next is on Branch, then yes, 0..Fork are passed.
-                // Check if Next is actually on Branch Row
-                const branchRow = document.querySelector('.branch-row');
-                if (branchRow) {
-                     const branchStations = Array.from(branchRow.querySelectorAll('.station-node'));
-                     const nextInBranch = branchStations.some(s => s.querySelector('.station-name').textContent === nextStationName);
-                     if (nextInBranch) {
-                         // We are on Branch. Main Row 0..Fork are passed.
-                         stations.forEach((s, i) => {
-                             if (i <= forkIndex) {
-                                 s.querySelector('.station-circle').classList.add('passed');
-                             }
-                         });
-                     }
-                }
+                // If next is not in row, we already handled passed marking above for specific cases.
             }
             
-            if (startColorIndex >= 0 && endColorIndex >= startColorIndex) {
-                const startRect = stations[startColorIndex].getBoundingClientRect();
-                const endRect = stations[endColorIndex].getBoundingClientRect();
+            if (startColorIndex !== -1 && endColorIndex !== -1) {
+                const currentStart = Math.min(startColorIndex, endColorIndex);
+                const currentEnd = Math.max(startColorIndex, endColorIndex);
+                const startRect = stations[currentStart].getBoundingClientRect();
+                const endRect = stations[currentEnd].getBoundingClientRect();
                 const startCenterX = startRect.left + startRect.width / 2;
                 const endCenterX = endRect.left + endRect.width / 2;
                 coloredLeft = Math.min(startCenterX, endCenterX) - rowLeft;
@@ -1020,7 +1066,14 @@ function computeRailAndConnectors() {
                  } else {
                      // Next not in row.
                      // If on branch, 0..Fork are passed.
-                     if (seg < forkIndex) colorClass = 'gray';
+                     if (seg < forkIndex) {
+                         const direction = parseInt(document.getElementById('direction-data')?.textContent || '0');
+                         if (direction === 1) {
+                                     colorClass = (seg < forkIndex) ? 'black' : 'gray';
+                                 } else {
+                                     colorClass = 'gray';
+                                 }
+                     }
                      else {
                          // Segments after fork on Main Row (when Next is on Branch)
                          // These are Inactive Main Route segments.
@@ -1059,9 +1112,18 @@ function computeRailAndConnectors() {
              const lastRect = stations[stations.length - 1].getBoundingClientRect();
              const firstCenterX = firstRect.left + firstRect.width / 2;
              const lastCenterX = lastRect.left + lastRect.width / 2;
-             const railLeft = Math.min(firstCenterX, lastCenterX) - rowLeft;
              const railWidth = Math.abs(lastCenterX - firstCenterX);
-             row.style.setProperty('--rail-left', Math.max(0, railLeft) + 'px');
+             
+             if (row.classList.contains('reverse')) {
+                 const rowRight = row.getBoundingClientRect().right;
+                 const railRight = rowRight - Math.max(firstCenterX, lastCenterX);
+                 row.style.setProperty('--rail-left', 'auto');
+                 row.style.setProperty('--rail-right', Math.max(0, railRight) + 'px');
+             } else {
+                 const railLeft = Math.min(firstCenterX, lastCenterX) - rowLeft;
+                 row.style.setProperty('--rail-left', Math.max(0, railLeft) + 'px');
+                 row.style.setProperty('--rail-right', 'auto');
+             }
              row.style.setProperty('--rail-width', railWidth + 'px');
              
              // Find next station in this branch row
@@ -1073,37 +1135,134 @@ function computeRailAndConnectors() {
                  }
              });
              
-             let coloredLeft = Math.max(0, railLeft);
+             let coloredLeft = 0;
+             let coloredRight = 0;
              let coloredWidth = 0;
              let startColorIndex = -1;
+             
+             // Initial defaults based on rail position
+             if (row.classList.contains('reverse')) {
+                 const rowRight = row.getBoundingClientRect().right;
+                 coloredRight = rowRight - Math.max(firstCenterX, lastCenterX);
+             } else {
+                 coloredLeft = Math.min(firstCenterX, lastCenterX) - rowLeft;
+             }
              
              if (nextStationInRowIndex >= 0) {
                  // Next is in this row. Color from Next -> End.
                  startColorIndex = nextStationInRowIndex;
                  // Mark passed
+                 const direction = parseInt(document.getElementById('direction-data')?.textContent || '0'); // 获取方向
                  stations.forEach((s, i) => {
-                     if (i < nextStationInRowIndex) {
-                         s.querySelector('.station-circle').classList.add('passed');
+                     if (direction === 1) { // 反向模式
+                         if (i > nextStationInRowIndex) { // 标记下一站之后的站点为passed
+                             s.querySelector('.station-circle').classList.add('passed');
+                         }
+                     } else { // 正向模式
+                         if (i < nextStationInRowIndex) { // 标记下一站之前的站点为passed
+                             s.querySelector('.station-circle').classList.add('passed');
+                         }
                      }
                  });
              } else {
                  // Next is NOT in this row.
-                 // Must be upstream (in Main Row before Fork).
-                 // So Branch Row is entirely Future -> Color Start -> End.
-                 startColorIndex = 0;
+                 // Check if Next is on Main Line AFTER the fork.
+                 const mainRow = document.querySelector('.line-row:not(.branch-row)');
+                 if (mainRow) {
+                     const forkIdx = parseInt(mainRow.dataset.forkIndex || '-1');
+                     const mainStations = Array.from(mainRow.querySelectorAll('.station-node'));
+                     const nextInMainIdx = mainStations.findIndex(s => s.querySelector('.station-name').textContent === nextStationName);
+                     
+                     if (nextInMainIdx >= 0) {
+                        // Check Direction!
+                        // If Forward (0): Main(0..F) -> Branch.
+                        // If Reverse (1): Branch -> Main(F..0).
+                        
+                        // Wait, "Main Line AFTER the fork" depends on direction?
+                        // "After the fork" usually means the extension part (F+1..N).
+                        // If Reverse: Branch -> Fork -> Main(0..F).
+                        // The "Extension" (F+1..N) is not part of the route.
+                        
+                        // If nextInMainIdx > forkIdx:
+                        // This implies Next is on the extension part.
+                        // If Route is Main->Main, Branch is inactive.
+                        // If Route is Main->Branch, Next shouldn't be there.
+                        
+                        // Let's rely on "passed" logic.
+                        // If Next is in Main (anywhere), Branch is either Passed or Future.
+                        // Forward: Main(Next) -> Fork -> Branch. (Next < Fork). Branch is Future.
+                        // Forward: Fork -> Branch(Next). (Next in Branch). Branch is Active.
+                        // Forward: Main(Next) -> End. (Next > Fork). Branch is Inactive/Passed.
+                        
+                        // Reverse: Branch(Next) -> Fork -> Main. (Next in Branch). Branch is Active.
+                        // Reverse: Branch -> Fork -> Main(Next). (Next < Fork). Branch is Passed.
+                        
+                        if (nextInMainIdx > forkIdx) {
+                            // Forward: Next is after fork. Branch is Passed/Inactive.
+                            stations.forEach(s => s.querySelector('.station-circle').classList.add('passed'));
+                            startColorIndex = -1; 
+                        } else {
+                            // Next is before Fork.
+                            // Forward: Branch is Future.
+                            // Reverse: Branch is Passed.
+                            
+                            const direction = parseInt(document.getElementById('direction-data')?.textContent || '0');
+                            if (direction === 1) {
+                                // Reverse: Branch -> Fork -> Main(Next).
+                                // Branch is Passed.
+                                stations.forEach(s => s.querySelector('.station-circle').classList.add('passed'));
+                                startColorIndex = -1;
+                            } else {
+                                // Forward: Main(Next) -> Fork -> Branch.
+                                // Branch is Future.
+                                startColorIndex = 0;
+                            }
+                        }
+                     } else {
+                         // Next not in Main? (Maybe data error or not found).
+                         // Assume Future.
+                         startColorIndex = 0;
+                     }
+                 } else {
+                     // No main row found, assume branch is future.
+                     startColorIndex = 0;
+                 }
              }
              
              if (startColorIndex >= 0) {
-                 const endColorIndex = stations.length - 1;
+                 const direction = parseInt(document.getElementById('direction-data')?.textContent || '0');
+                 const endColorIndex = (direction === 1) ? 0 : (stations.length - 1);
                  const startRect = stations[startColorIndex].getBoundingClientRect();
                  const endRect = stations[endColorIndex].getBoundingClientRect();
                  const startCenterX = startRect.left + startRect.width / 2;
                  const endCenterX = endRect.left + endRect.width / 2;
-                 coloredLeft = Math.min(startCenterX, endCenterX) - rowLeft;
+                 
                  coloredWidth = Math.abs(endCenterX - startCenterX);
+                 
+                 if (row.classList.contains('reverse')) {
+                     const rowRight = row.getBoundingClientRect().right;
+                     coloredRight = rowRight - Math.max(startCenterX, endCenterX);
+                     // Check if width is correct.
+                     // startColorIndex (Next) -> EndIndex (End of Row).
+                     // In Reverse, End of Row is Leftmost (index N).
+                     // Start (Next) is somewhere.
+                     // Colored part: Next -> End (Leftward).
+                     // coloredRight = Distance from Row Right Edge to Rightmost point of colored segment.
+                     // Colored segment is between startCenterX and endCenterX.
+                     // Rightmost point is max(startCenterX, endCenterX).
+                     // This looks correct.
+                 } else {
+                     coloredLeft = Math.min(startCenterX, endCenterX) - rowLeft;
+                 }
              }
              
-             row.style.setProperty('--rail-colored-left', Math.max(0, coloredLeft) + 'px');
+             if (row.classList.contains('reverse')) {
+                 row.style.setProperty('--rail-colored-left', 'auto');
+                 row.style.setProperty('--rail-colored-right', Math.max(0, coloredRight) + 'px');
+             } else {
+                 row.style.setProperty('--rail-colored-left', Math.max(0, coloredLeft) + 'px');
+                 row.style.setProperty('--rail-colored-right', 'auto');
+             }
              row.style.setProperty('--rail-colored-width', coloredWidth + 'px');
              
              const rowCenterY = row.getBoundingClientRect().height / 2;
@@ -1495,46 +1654,7 @@ function computeRailAndConnectors() {
         });
     }
 
-    // Custom Logic to handle Diagonal Connector Color (Passed vs Future)
-    if (window.isCustomBranchMode) {
-        const connector = document.querySelector('.branch-connector');
-        if (connector) {
-             const branchRow = document.querySelector('.branch-row');
-             const nextStationName = JSON.parse(document.getElementById('next-station-data')?.textContent || 'null');
-             let isConnectorPassed = false;
-             
-             // If Next Station is on Branch Row (or beyond it), connector is Passed.
-             // If Next Station is on Main Row (before Fork), connector is Future.
-             // If Next Station is on Main Row (after Fork), connector is Inactive (handled by inactive-row check in creation).
-             
-             if (branchRow) {
-                 const branchStations = Array.from(branchRow.querySelectorAll('.station-node'));
-                 const nextInBranch = branchStations.some(s => s.querySelector('.station-name').textContent === nextStationName);
-                 if (nextInBranch) {
-                     isConnectorPassed = true;
-                     // Exception: If Next is the FIRST station of Branch, connector is technically "Current" segment (Red?) or "Future" relative to Fork?
-                     // Usually connector is part of the segment leading TO the first station.
-                     // If Next is 1st station, segment leading to it is Active (Red/Theme).
-                     // If Next is 2nd station, segment leading to 1st is Passed (Gray).
-                     
-                     const nextIndex = branchStations.findIndex(s => s.querySelector('.station-name').textContent === nextStationName);
-                     if (nextIndex === 0) {
-                         isConnectorPassed = false; // It's the active segment approaching Next
-                     }
-                 }
-             }
-             
-             // Re-evaluate color based on Passed/Future logic
-             const themeColor = getComputedStyle(document.getElementById('metro-line')).getPropertyValue('--theme-color').trim() || '#9b5de5';
-             if (connector.style.backgroundColor !== 'rgb(221, 221, 221)' && connector.style.backgroundColor !== '#ddd') { // Only if active
-                 if (isConnectorPassed) {
-                     connector.style.backgroundColor = '#cfcfcf'; // Passed -> Gray
-                 } else {
-                     connector.style.backgroundColor = themeColor; // Future -> Theme
-                 }
-             }
-        }
-    }
+    
 
     // 为换乘站创建旋转多色环
 function createTransferRings() {
