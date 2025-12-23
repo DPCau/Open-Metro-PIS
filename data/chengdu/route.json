@@ -122,7 +122,7 @@
   },
   "line_7": {
     "line_name": "7号线-Line 7",
-    "layout": "auto",
+    "layout": "two_line",
     "type": "loop",
     "station_spacing_multiplier": 1,
     "services": [

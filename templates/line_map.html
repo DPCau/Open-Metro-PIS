@@ -747,10 +747,11 @@ function createZigzagLayout() {
                         const rect2 = branchStartStation.getBoundingClientRect();
                         const containerRect = metroLine.getBoundingClientRect();
                         
+                        const offsetY = (derection === 1) ? -10 : 0;
                         const x1 = rect1.left + rect1.width / 2 - containerRect.left;
-                        const y1 = rect1.top + rect1.height / 2 - containerRect.top;
+                        const y1 = rect1.top + rect1.height / 2 - containerRect.top + offsetY;
                         const x2 = rect2.left + rect2.width / 2 - containerRect.left;
-                        const y2 = rect2.top + rect2.height / 2 - containerRect.top;
+                        const y2 = rect2.top + rect2.height / 2 - containerRect.top + offsetY;
                         
                         const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
                         const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
@@ -965,8 +966,11 @@ function computeRailAndConnectors() {
                     // We are in Main Row, Branch is Active.
                     // If Next Station is BEFORE or AT Fork, the Main Extension (Fork..End) is NOT the active path.
                     // The active path goes to Branch.
-                    if (nextStationInRowIndex <= forkIndex) {
-                        endColorIndex = forkIndex;
+                    const direction = parseInt(document.getElementById('direction-data')?.textContent || '0');
+                    if (direction === 0) {
+                        if (nextStationInRowIndex <= forkIndex) {
+                            endColorIndex = forkIndex;
+                        }
                     }
                 }
             } else {
@@ -1009,7 +1013,7 @@ function computeRailAndConnectors() {
                                  // Reverse: Branch -> Fork -> Main(0..Fork).
                                  // Main(0..Fork) is Future (Active).
                                  startColorIndex = forkIndex;
-                                 endColorIndex = 0;
+                                 endColorIndex = stations.length - 1;
                                  // Do NOT mark as passed.
                              } else {
                                  // Forward: Main(0..Fork) -> Branch.
@@ -1067,12 +1071,7 @@ function computeRailAndConnectors() {
                      // Next not in row.
                      // If on branch, 0..Fork are passed.
                      if (seg < forkIndex) {
-                         const direction = parseInt(document.getElementById('direction-data')?.textContent || '0');
-                         if (direction === 1) {
-                                     colorClass = (seg < forkIndex) ? 'black' : 'gray';
-                                 } else {
-                                     colorClass = 'gray';
-                                 }
+                         colorClass = 'gray';
                      }
                      else {
                          // Segments after fork on Main Row (when Next is on Branch)
@@ -1762,6 +1761,363 @@ function renderLoopMap() {
     rl.style.display = '';
     ml.style.display = 'none';
     rl.innerHTML = '';
+
+    const layoutMode = JSON.parse(document.getElementById('layout-mode-data')?.textContent || '"auto"');
+    if (layoutMode === 'two_line') {
+        const container = document.querySelector('.line-map-container');
+        const reserve = 160;
+        const minWidth = 680;
+        const containerRectWidth = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
+        const width = Math.max(minWidth, containerRectWidth - 40); // 将 reserve 从 160 减小到 40，增加可用宽度
+        const height = Math.max(320, Math.min(520, Math.round(width * 0.45)));
+        const margin = 40;
+        const W = width - margin * 2;
+        const H = height - margin * 2;
+        const ns = 'http://www.w3.org/2000/svg';
+        const strokeWidth = 15;
+
+        // 确保容器允许内容溢出显示（用于显示圆圈边缘）
+        rl.style.overflow = 'visible';
+        const svg = document.createElementNS(ns, 'svg');
+        svg.setAttribute('width', String(width));
+        svg.setAttribute('height', String(height));
+        svg.style.display = 'block';
+        rl.style.position = 'relative';
+        rl.style.margin = '0 auto';
+        rl.style.width = `${width}px`;
+        rl.style.height = `${height}px`;
+        svg.style.position = 'absolute';
+        svg.style.top = '0';
+        svg.style.left = '0';
+        svg.style.zIndex = '0';
+
+        const group = document.createElement('div');
+        group.style.position = 'absolute';
+        group.style.left = '0';
+        group.style.top = '0';
+        group.style.width = `${width}px`;
+        group.style.height = `${height}px`;
+        group.style.zIndex = '1';
+
+        rl.appendChild(svg);
+        rl.appendChild(group);
+
+        const sidePad = Math.round(W * 0.05);
+        const xL = margin + sidePad;
+        const xR = margin + W - sidePad;
+        const xC = (xL + xR) / 2;
+
+        const vLen = Math.round(Math.max(120, Math.min(200, H * 0.35)));
+        const padY = Math.round((H - vLen) / 2) - 150; 
+        const yT = margin + padY;
+        const yB = yT + vLen;
+        const r = Math.round(vLen / 2);
+
+        // 使用圆弧连接：顶边直线 -> 右侧半圆弧 -> 底边直线 -> 左侧半圆弧 -> 闭合
+        // 路径：从顶部中间 (xC, yT) 向左到 (xL, yT) -> 逆时针半圆弧到 (xL, yB) -> 向右到 (xR, yB) -> 逆时针半圆弧到 (xR, yT) -> 回到 (xC, yT)
+        const dStr = `M ${xC} ${yT} L ${xL} ${yT} A ${r} ${r} 0 0 0 ${xL} ${yB} L ${xR} ${yB} A ${r} ${r} 0 0 0 ${xR} ${yT} L ${xC} ${yT}`;
+        const base = document.createElementNS(ns, 'path');
+        base.setAttribute('d', dStr);
+        base.setAttribute('fill', 'none');
+        base.setAttribute('stroke', '#ddd');
+        base.setAttribute('stroke-width', String(strokeWidth));
+        base.setAttribute('stroke-linejoin', 'round');
+        base.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(base);
+
+        const themeColor = getComputedStyle(document.querySelector('.line-map')).getPropertyValue('--theme-color').trim() || '#9b5de5';
+        const colored = document.createElementNS(ns, 'path');
+        colored.setAttribute('d', dStr);
+        colored.setAttribute('fill', 'none');
+        colored.setAttribute('stroke', themeColor);
+        colored.setAttribute('stroke-width', String(strokeWidth));
+        colored.setAttribute('stroke-linejoin', 'round');
+        colored.setAttribute('stroke-linecap', 'round');
+        svg.appendChild(colored);
+
+        const getStationNum = (s) => {
+            const idx = s.station_index;
+            if (Array.isArray(idx)) {
+                const v = idx[idx.length - 1];
+                const m = String(v || '').match(/^\d+$/);
+                return m ? parseInt(v, 10) : NaN;
+            } else {
+                const m = String(idx || '').match(/^\d+$/);
+                return m ? parseInt(idx, 10) : NaN;
+            }
+        };
+        const entries = lineInfo.map((s, i) => ({ s, i, num: getStationNum(s) }));
+        entries.sort((A, B) => {
+            const a = isNaN(A.num) ? Number.MAX_SAFE_INTEGER : A.num;
+            const b = isNaN(B.num) ? Number.MAX_SAFE_INTEGER : B.num;
+            return a - b;
+        });
+        const ordered = entries.map(e => e.s);
+        const seen = new Set();
+        const orderedUnique = [];
+        for (const s of ordered) {
+            const key = s.station_name || JSON.stringify(s.station_index);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            orderedUnique.push(s);
+        }
+        const nU = orderedUnique.length;
+        const nextStationName = JSON.parse(document.getElementById('next-station-data')?.textContent || 'null');
+        const anchorPos = orderedUnique.findIndex(s => getStationNum(s) === 1);
+        const seq = (anchorPos >= 0) ? orderedUnique.slice(anchorPos).concat(orderedUnique.slice(0, anchorPos)) : orderedUnique.slice();
+
+        let k1 = Math.max(1, Math.ceil(nU / 4));
+        let k3 = Math.max(1, Math.floor(nU / 4));
+        let k2 = nU - k1 - k3;
+        if (k2 < 1) {
+            k2 = 1;
+            if (k3 > 1) k3 -= 1;
+            else if (k1 > 1) k1 -= 1;
+        }
+
+        const L1 = Math.abs(xC - xL);
+        const arcLen = Math.PI * r; // 半圆弧长度
+        const L3 = Math.abs(xR - xL);
+        const dBottomStart = L1 + arcLen;
+        const dRightTopStart = dBottomStart + L3 + arcLen;
+        const totalLen = base.getTotalLength();
+
+        const pts = [];
+        const nodes = [];
+        const dPos = [];
+
+        const pushNode = (st, d) => {
+            const pt = base.getPointAtLength(d);
+            pts.push(pt);
+            dPos.push(d);
+            const tmp = document.createElement('div');
+            tmp.innerHTML = createStationNode(st);
+            const node = tmp.firstElementChild;
+            node.style.position = 'absolute';
+            node.style.left = `${pt.x}px`;
+            node.style.top = `${pt.y}px`;
+            node.style.transform = 'translate(-50%, -50%)';
+            const labels = node.querySelector('.station-labels');
+            const badges = node.querySelector('.transfer-badges');
+            
+            // 环线 two_line 专用布局
+            const isTopRow = Math.abs(pt.y - yT) < 10;
+            if (labels) {
+                if (isTopRow) {
+                    labels.style.bottom = '28px';
+                    labels.style.top = 'auto';
+                } else {
+                    labels.style.top = '28px';
+                    labels.style.bottom = 'auto';
+                }
+                labels.style.left = '50%';
+                labels.style.right = 'auto';
+                labels.style.transform = 'translateX(-50%) rotate(0deg)';
+                labels.style.textAlign = 'center';
+                labels.style.width = 'max-content';
+                labels.style.flexDirection = 'column';
+                labels.style.alignItems = 'center'; // 确保 Flex 子项（每行文字）居中对齐
+                
+                // 强制修正子元素（如英文名）的对齐方式
+                const subLabels = labels.querySelectorAll('.station-name');
+                subLabels.forEach(sl => {
+                    sl.style.textAlign = 'center';
+                    sl.style.width = '100%';
+                });
+            }
+            if (badges) {
+                if (isTopRow) {
+                    badges.style.top = '28px';
+                    badges.style.bottom = 'auto';
+                } else {
+                    badges.style.bottom = '28px';
+                    badges.style.top = 'auto';
+                }
+                badges.style.left = '50%';
+                badges.style.right = 'auto';
+                badges.style.transform = 'translateX(-50%)';
+                badges.style.flexDirection = 'row';
+                badges.style.justifyContent = 'center';
+            }
+            
+            group.appendChild(node);
+            nodes.push(node);
+        };
+
+        if (k1 === 1) {
+            pushNode(seq[0], 0);
+        } else {
+            for (let i = 0; i < k1; i++) {
+                const d = L1 * (i / (k1 - 1));
+                pushNode(seq[i], d);
+            }
+        }
+
+        if (k2 === 1) {
+            pushNode(seq[k1], dBottomStart + L3 / 2);
+        } else {
+            for (let i = 0; i < k2; i++) {
+                const d = dBottomStart + L3 * (i / (k2 - 1));
+                pushNode(seq[k1 + i], d);
+            }
+        }
+
+        if (k3 === 1) {
+            pushNode(seq[k1 + k2], dRightTopStart);
+        } else {
+            for (let i = 0; i < k3; i++) {
+                const d = dRightTopStart + L1 * (i / k3);
+                pushNode(seq[k1 + k2 + i], d);
+            }
+        }
+
+        for (let i = 0; i < nU; i++) {
+            const idxA = i;
+            const idxB = (derection === 0 ? (i + 1) : (i - 1 + nU)) % nU;
+            
+            const dA = dPos[idxA];
+            let dB = dPos[idxB];
+            
+            // 计算路径上的中点距离
+            let midDist;
+            if (derection === 0) {
+                // 顺时针方向 i -> i+1
+                if (dB < dA) dB += totalLen; // 处理跨越起点的情况
+                midDist = (dA + dB) / 2 % totalLen;
+            } else {
+                // 逆时针方向 i -> i-1
+                let tempA = dA;
+                if (dB > tempA) tempA += totalLen; // 处理跨越起点的情况
+                midDist = (tempA + dB) / 2 % totalLen;
+            }
+            
+            // 使用 getPointAtLength 获取路径上的精确坐标（确保在圆弧上）
+            const pt = base.getPointAtLength(midDist);
+            const pA = pts[idxA];
+            const pB = pts[idxB];
+
+            // 计算切线方向用于旋转箭头（可选，但这里我们继续使用原来的 dx, dy 判断符号）
+            const dx = pB.x - pA.x;
+            const dy = pB.y - pA.y;
+            
+            const arrow = document.createElement('div');
+            arrow.className = 'direction-arrow black';
+            let ch;
+            
+            // 基于 dx, dy 判断箭头符号
+            if (Math.abs(dx) > Math.abs(dy)) {
+                ch = dx > 0 ? '→' : '←';
+            } else {
+                ch = dy > 0 ? '↓' : '↑';
+            }
+            
+            arrow.textContent = ch;
+            arrow.style.position = 'absolute';
+            arrow.style.left = `${pt.x}px`;
+            arrow.style.top = `${pt.y}px`;
+            arrow.style.transform = 'translate(-50%, -50%)';
+            group.appendChild(arrow);
+        }
+
+        (function applyLoopPassedTwoLine() {
+            const nextIdxU = seq.findIndex(s => s.station_name === nextStationName);
+            const hasTerminal = JSON.parse(document.getElementById('loop-has-terminal-data')?.textContent || 'false');
+            const terminalName = JSON.parse(document.getElementById('loop-terminal-station-data')?.textContent || 'null');
+            const terminalIdxU = seq.findIndex(s => s.station_name === terminalName);
+            if (nextIdxU < 0) return;
+
+            const stepNext = (i) => (derection === 0 ? (i + 1) % nU : (i - 1 + nU) % nU);
+            const stepPrev = (i) => (derection === 0 ? (i - 1 + nU) % nU : (i + 1) % nU);
+
+            let passedIndices = [];
+            let startIdxForArc = -1;
+            let L = 0;
+            let shouldDrawGrayLine = false;
+            let startArcPos = 0;
+
+            const isNextStationTerminal = (hasTerminal && nextIdxU === terminalIdxU);
+
+            if (isNextStationTerminal) {
+                for (let i = 0; i < nU; i++) {
+                    if (i !== nextIdxU) {
+                        passedIndices.push(i);
+                    }
+                }
+                L = totalLen;
+                startArcPos = dPos[nextIdxU];
+                shouldDrawGrayLine = true;
+            } else if (hasTerminal && terminalIdxU >= 0) {
+                let i = terminalIdxU;
+                startIdxForArc = terminalIdxU;
+                while (i !== nextIdxU) {
+                    if (i !== terminalIdxU) {
+                        passedIndices.push(i);
+                    }
+                    i = stepNext(i);
+                }
+                
+                // 计算灰线长度 L：从 terminal 顺着前进方向到 nextStation
+                const startD = dPos[terminalIdxU];
+                const endD = dPos[nextIdxU];
+                if (derection === 0) {
+                    // 外环顺时针：灰线长度 = (endD - startD + totalLen) % totalLen
+                    L = (endD - startD + totalLen) % totalLen;
+                    startArcPos = startD;
+                } else {
+                    // 内环逆时针：灰线长度 = (startD - endD + totalLen) % totalLen
+                    L = (startD - endD + totalLen) % totalLen;
+                    startArcPos = endD; // 逆时针绘制，dashoffset 需要从 endD 开始
+                }
+                shouldDrawGrayLine = true;
+            } else {
+                // 非终端模式：只变灰上一站
+                const prevIdxU = stepPrev(nextIdxU);
+                passedIndices.push(prevIdxU);
+                startIdxForArc = prevIdxU;
+                const startD = dPos[startIdxForArc];
+                const endD = dPos[nextIdxU];
+                if (derection === 0) {
+                    L = (endD - startD + totalLen) % totalLen;
+                    startArcPos = startD;
+                } else {
+                    L = (startD - endD + totalLen) % totalLen;
+                    startArcPos = endD;
+                }
+                shouldDrawGrayLine = true;
+            }
+
+            passedIndices.forEach(i => {
+                const circle = nodes[i]?.querySelector('.station-circle');
+                if (circle) circle.classList.add('passed');
+            });
+
+            if (shouldDrawGrayLine && L > 0) {
+                const passedStroke = document.createElementNS(ns, 'path');
+                passedStroke.setAttribute('d', dStr);
+                passedStroke.setAttribute('fill', 'none');
+                passedStroke.setAttribute('stroke', '#cfcfcf');
+                passedStroke.setAttribute('stroke-width', String(strokeWidth));
+                passedStroke.setAttribute('stroke-linecap', 'butt');
+                passedStroke.setAttribute('stroke-dasharray', `${L} ${totalLen - L}`);
+                passedStroke.setAttribute('stroke-dashoffset', String((totalLen - startArcPos) % totalLen));
+                svg.appendChild(passedStroke);
+            }
+        })();
+
+        setTransferBadgeColors();
+        createTransferRings();
+
+        if (rl && rl.dataset.settle !== 'done') {
+            rl.dataset.settle = 'pending';
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    rl.dataset.settle = 'done';
+                    renderLoopMap();
+                }, 60);
+            });
+        }
+        return;
+    }
 
     const container = document.querySelector('.line-map-container');
     const reserve = 160; // 为外侧标签和安全边留白，防止溢出

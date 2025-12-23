@@ -82,9 +82,9 @@ except Exception as e:
 
 # 模拟当前状态数据
 current_state = {
-    'line_name': 'line_4',
+    'line_name': 'line_7',
     'route_name': 'route1',
-    'next_station': '骡马市',
+    'next_station': '火车南站',
     'direction':0, # 方向：0与数据文件顺序一致，1为反向（显示反转）
     'door_side': '本侧',  # 本侧或对侧
     'current_carriage': 3
@@ -571,8 +571,6 @@ def line_map():
             route_data = _get_route_data()
             d = route_data.get(line_name, {})
             layout_mode = (d.get('layout') or 'auto')
-            if is_loop:
-                layout_mode = 'auto'
         except Exception:
             layout_mode = 'auto'
 
