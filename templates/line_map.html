@@ -132,7 +132,6 @@
     }
     
     :root {
-        --theme-color: #9b5de5;
         /* 箭头配置 */
         --arrow-size: 25px;
         --arrow-weight: 900;
@@ -496,10 +495,7 @@
     </div>
 </div>
 
-<div class="navigation-buttons" style="margin-top: 30px; display: flex; justify-content: center; gap: 20px;">
-    <button class="btn" onclick="navigateTo('/')">返回首页</button>
-    <button class="btn" onclick="navigateTo('/line_detail')">线路详情</button>
-</div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -512,7 +508,8 @@ const currentRouteSet = new Set(currentRouteStations);
 const nextStationName = JSON.parse(document.getElementById('next-station-data')?.textContent || 'null');
 const isReversed = JSON.parse(document.getElementById('is-reversed-data')?.textContent || 'false');
 const isLoop = JSON.parse(document.getElementById('is-loop-data')?.textContent || 'false');
-const derection = parseInt(document.getElementById('direction-data')?.textContent || '0');
+const direction = parseInt(document.getElementById('direction-data')?.textContent || '0');
+const derection = direction;
 const transData = JSON.parse(document.getElementById('trans-data')?.textContent || '{}');
 
 // 创建站点节点HTML
@@ -628,7 +625,7 @@ function createZigzagLayout() {
                         transfer_badges: []
                     };
                 }
-                const isDirReverse = derection === 1;
+                const isDirReverse = direction === 1;
                 const forkIndexOrig = forkIndex;
                 const mainStationObjs = (isDirReverse ? mainStations.slice().reverse().map(getStationObj) : mainStations.map(getStationObj));
                 const branchStationObjs = branchStations.slice(forkIndexOrig + 1).map(getStationObj);
@@ -747,7 +744,7 @@ function createZigzagLayout() {
                         const rect2 = branchStartStation.getBoundingClientRect();
                         const containerRect = metroLine.getBoundingClientRect();
                         
-                        const offsetY = (derection === 1) ? -10 : 0;
+                        const offsetY = (direction === 1) ? -10 : 0;
                         const x1 = rect1.left + rect1.width / 2 - containerRect.left;
                         const y1 = rect1.top + rect1.height / 2 - containerRect.top + offsetY;
                         const x2 = rect2.left + rect2.width / 2 - containerRect.left;
@@ -771,9 +768,13 @@ function createZigzagLayout() {
                         const themeColor = getComputedStyle(metroLine).getPropertyValue('--theme-color').trim() || '#9b5de5';
                         const isPassed = branchStartStation.querySelector('.station-circle').classList.contains('passed');
                         const branchStationsNow = Array.from(rowBranch.querySelectorAll('.station-node'));
+                        const branchStartName = branchStationsNow[0].querySelector('.station-name').textContent;
                         const nextInBranchIdx = branchStationsNow.findIndex(s => s.querySelector('.station-name').textContent === nextStationName);
+                        
                         let toColor = false;
-                        if (nextInBranchIdx >= 0) {
+                        if (fullRouteMode && !currentRouteSet.has(branchStartName)) {
+                            toColor = false;
+                        } else if (nextInBranchIdx >= 0) {
                             const direction = parseInt(document.getElementById('direction-data')?.textContent || '0');
                             toColor = (direction === 1);
                         } else if (isBranchActive && !isPassed) {
@@ -793,7 +794,7 @@ function createZigzagLayout() {
         row.className = 'line-row';
         row.dataset.startIndex = '0';
         row.dataset.endIndex = String(lineInfo.length - 1);
-        const oneLineStations = derection === 1 ? lineInfo.slice().reverse() : lineInfo;
+        const oneLineStations = lineInfo;
         row.innerHTML = oneLineStations.map(createStationNode).join('');
         const containerWidth2 = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
         const availableWidth2 = Math.max(0, containerWidth2 - margin * 2);
@@ -913,6 +914,14 @@ function computeRailAndConnectors() {
     metroLine.querySelectorAll('.connector').forEach(el => el.remove());
     metroLine.querySelectorAll('.direction-arrow').forEach(el => el.remove());
     
+    // 计算全局活动区间（用于连接线和轨道灰显判断）
+    let activeStartIdx = -1, activeEndIdx = -1;
+    if (fullRouteMode) {
+        const activeIndices = currentRouteStations.length ? lineInfo.map((s, i) => currentRouteSet.has(s.station_name) ? i : -1).filter(i => i >= 0) : [];
+        activeStartIdx = activeIndices.length ? Math.min(...activeIndices) : -1;
+        activeEndIdx = activeIndices.length ? Math.max(...activeIndices) : -1;
+    }
+
     // 先计算每行的轨道（灰色与彩色段）
     rows.forEach((row, rowIndex) => {
         if (row.classList.contains('inactive-row')) return;
@@ -971,6 +980,19 @@ function computeRailAndConnectors() {
                         if (nextStationInRowIndex <= forkIndex) {
                             endColorIndex = forkIndex;
                         }
+                    }
+                }
+
+                // If fullRouteMode is active, further constrain endColorIndex by active range in this row
+                if (fullRouteMode) {
+                    const rowActiveIndices = stations.map((s, i) => currentRouteSet.has(s.querySelector('.station-name').textContent) ? i : -1).filter(i => i >= 0);
+                    if (rowActiveIndices.length > 0) {
+                        const localActiveEnd = Math.max(...rowActiveIndices);
+                        endColorIndex = Math.min(endColorIndex, localActiveEnd);
+                    } else {
+                        // No active stations in this row
+                        startColorIndex = -1;
+                        endColorIndex = -1;
                     }
                 }
             } else {
@@ -1061,6 +1083,19 @@ function computeRailAndConnectors() {
             
             const rowCenterY = row.getBoundingClientRect().height / 2;
              for (let seg = 0; seg < stations.length - 1; seg++) {
+                 const rowStartIndex = parseInt(row.dataset.startIndex || '0');
+                 const segAIdx = rowStartIndex + seg;
+                 const segBIdx = segAIdx + 1;
+                 
+                // Skip arrows for inactive segments in fullRouteMode
+                if (fullRouteMode) {
+                    const nameA = stations[seg].querySelector('.station-name').textContent;
+                    const nameB = stations[seg + 1].querySelector('.station-name').textContent;
+                    if (!currentRouteSet.has(nameA) || !currentRouteSet.has(nameB)) {
+                        continue;
+                    }
+                }
+
                  let colorClass = 'black'; // Future = Black/Theme
                  
                  // Passed = Gray
@@ -1230,7 +1265,45 @@ function computeRailAndConnectors() {
              
              if (startColorIndex >= 0) {
                  const direction = parseInt(document.getElementById('direction-data')?.textContent || '0');
-                 const endColorIndex = (direction === 1) ? 0 : (stations.length - 1);
+                 let endColorIndex = (direction === 1) ? 0 : (stations.length - 1);
+
+                // If fullRouteMode is active, further constrain active range in this row
+                if (fullRouteMode) {
+                    const rowActiveIndices = stations.map((s, i) => currentRouteSet.has(s.querySelector('.station-name').textContent) ? i : -1).filter(i => i >= 0);
+                    if (rowActiveIndices.length > 0) {
+                        const localActiveStart = Math.min(...rowActiveIndices);
+                        const localActiveEnd = Math.max(...rowActiveIndices);
+                        
+                        // startColorIndex is where we start coloring (usually next station)
+                        // It should not be before the first active station in this row
+                        if (startColorIndex !== -1) {
+                            startColorIndex = Math.max(startColorIndex, localActiveStart);
+                        }
+                        
+                        // endColorIndex should not exceed the last active station in this row
+                        if (direction === 0) {
+                            endColorIndex = Math.min(endColorIndex, localActiveEnd);
+                        } else {
+                            // In reverse, endColorIndex is 0 (row start)
+                            endColorIndex = Math.max(endColorIndex, localActiveStart);
+                        }
+                        
+                        // If next station is beyond the active range, don't color
+                        if (startColorIndex > localActiveEnd && direction === 0) {
+                            startColorIndex = -1;
+                            endColorIndex = -1;
+                        }
+                        if (startColorIndex < localActiveStart && direction === 1) {
+                            startColorIndex = -1;
+                            endColorIndex = -1;
+                        }
+                    } else {
+                        // No active stations in this row
+                        startColorIndex = -1;
+                        endColorIndex = -1;
+                    }
+                }
+
                  const startRect = stations[startColorIndex].getBoundingClientRect();
                  const endRect = stations[endColorIndex].getBoundingClientRect();
                  const startCenterX = startRect.left + startRect.width / 2;
@@ -1266,6 +1339,19 @@ function computeRailAndConnectors() {
              
              const rowCenterY = row.getBoundingClientRect().height / 2;
              for (let seg = 0; seg < stations.length - 1; seg++) {
+                 const rowStartIndex = parseInt(row.dataset.startIndex || '0');
+                 const segAIdx = rowStartIndex + seg;
+                 const segBIdx = segAIdx + 1;
+                 
+                // Skip arrows for inactive segments in fullRouteMode
+                if (fullRouteMode) {
+                    const nameA = stations[seg].querySelector('.station-name').textContent;
+                    const nameB = stations[seg + 1].querySelector('.station-name').textContent;
+                    if (!currentRouteSet.has(nameA) || !currentRouteSet.has(nameB)) {
+                        continue;
+                    }
+                }
+
                  let colorClass = 'black';
                  if (nextStationInRowIndex >= 0) {
                      if (seg < nextStationInRowIndex - 1) colorClass = 'gray';
@@ -1424,17 +1510,13 @@ function computeRailAndConnectors() {
             const globalNextIndex = parseInt(document.getElementById('metro-line').dataset.nextIndex || '-1');
             const laterIndex = (isNaN(rowStartIndex) ? (seg + 1) : (rowStartIndex + seg + 1));
 
-            // 仅在活动区间内绘制箭头；活动外的线段保持静止且不显示箭头
-            let activeStartIdx = -1, activeEndIdx = -1;
+            // Skip arrows for inactive segments in fullRouteMode
             if (fullRouteMode) {
-                const activeIndices = currentRouteStations.length ? lineInfo.map((s, i) => currentRouteSet.has(s.station_name) ? i : -1).filter(i => i >= 0) : [];
-                activeStartIdx = activeIndices.length ? Math.min(...activeIndices) : -1;
-                activeEndIdx = activeIndices.length ? Math.max(...activeIndices) : -1;
-            }
-            const segAIdx = isNaN(rowStartIndex) ? seg : (rowStartIndex + seg);
-            const segBIdx = segAIdx + 1;
-            if (fullRouteMode && !(segAIdx >= activeStartIdx && segAIdx <= activeEndIdx) && !(segBIdx >= activeStartIdx && segBIdx <= activeEndIdx)) {
-                continue;
+                const nameA = stations[seg].querySelector('.station-name').textContent;
+                const nameB = stations[seg + 1].querySelector('.station-name').textContent;
+                if (!currentRouteSet.has(nameA) || !currentRouteSet.has(nameB)) {
+                    continue;
+                }
             }
 
             let colorClass = 'black';
@@ -1454,14 +1536,6 @@ function computeRailAndConnectors() {
 
     // connector cap style moved to CSS <style> block
     
-    // 计算全局活动区间（用于连接线灰显判断）
-    let activeStartIdx = -1, activeEndIdx = -1;
-    if (fullRouteMode) {
-        const activeIndices = currentRouteStations.length ? lineInfo.map((s, i) => currentRouteSet.has(s.station_name) ? i : -1).filter(i => i >= 0) : [];
-        activeStartIdx = activeIndices.length ? Math.min(...activeIndices) : -1;
-        activeEndIdx = activeIndices.length ? Math.max(...activeIndices) : -1;
-    }
-
     // 再绘制每两行之间的平滑垂直连接
     for (let i = 0; i < rows.length - 1; i++) {
         // 在自定义分支模式下，不绘制默认的行间垂直连接线（改由 branch-connector 绘制斜线）

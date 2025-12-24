@@ -14,7 +14,7 @@ function updateTime() {
 }
 
 // 初始更新时间并设置定时器
-window.addEventListener('load', () => {
+document.addEventListener('DOMContentLoaded', () => {
     updateTime();
     setInterval(updateTime, 60000); // 每分钟更新一次
 });
@@ -111,6 +111,109 @@ function handleError(error, elementId = null) {
 // 页面跳转函数
 function navigateTo(page) {
     window.location.href = page;
+}
+
+// 键盘快捷键监听
+document.addEventListener('keydown', function(event) {
+    // 1 -> 首页, 2 -> 线路图, 3 -> 线路详情
+    if (event.key === '1') {
+        navigateTo('/');
+    } else if (event.key === '2') {
+        navigateTo('/line_map');
+    } else if (event.key === '3') {
+        navigateTo('/line_detail');
+    } else if (event.key === 'ArrowRight') {
+        // 右方向键 -> 下一站
+        fetch('/api/state/next', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                console.log('已切换至下一站:', data.next_station);
+                window.location.reload(); // 刷新页面以更新显示
+            })
+            .catch(err => console.error('切换下一站失败:', err));
+    } else if (event.key === 'ArrowLeft') {
+        // 左方向键 -> 上一站
+        fetch('/api/state/prev', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                console.log('已切换至上一站:', data.next_station);
+                window.location.reload(); // 刷新页面以更新显示
+            })
+            .catch(err => console.error('切换上一站失败:', err));
+    } else if (event.key.toLowerCase() === 'r') {
+        // R 键 -> 一键反向
+        fetch('/api/state/reverse', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                console.log('已切换方向:', data.direction === 0 ? '正向' : '反向');
+                window.location.reload();
+            })
+            .catch(err => console.error('切换方向失败:', err));
+    } else if (event.key === 'ArrowDown') {
+        // 下方向键 -> 切换下一个路由
+        fetch('/api/state/route/next', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                console.log('已切换路由:', data.route_name);
+                window.location.reload();
+            })
+            .catch(err => console.error('切换路由失败:', err));
+    } else if (event.key === 'ArrowUp') {
+        // 上方向键 -> 切换上一个路由
+        fetch('/api/state/route/prev', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                console.log('已切换路由:', data.route_name);
+                window.location.reload();
+            })
+            .catch(err => console.error('切换路由失败:', err));
+    } else if (event.key.toLowerCase() === 'l') {
+        // L 键 -> 切换下一条线路
+        fetch('/api/state/line/next', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                console.log('已切换至线路:', data.line_name);
+                window.location.reload();
+            })
+            .catch(err => console.error('切换线路失败:', err));
+    } else if (event.key.toLowerCase() === 'k') {
+        // K 键 -> 切换上一条线路
+        fetch('/api/state/line/prev', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                console.log('已切换至线路:', data.line_name);
+                window.location.reload();
+            })
+            .catch(err => console.error('切换线路失败:', err));
+    } else if (event.key.toLowerCase() === 'i') {
+        // i 键 -> 单行模式
+        updateLayout('one_line');
+    } else if (event.key.toLowerCase() === 'o') {
+        // o 键 -> 双行模式
+        updateLayout('two_line');
+    } else if (event.key.toLowerCase() === 'p') {
+        // p 键 -> 自动模式
+        updateLayout('auto');
+    }
+});
+
+// 更新布局模式
+function updateLayout(mode) {
+    fetch('/api/state/layout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: mode })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            console.log('布局模式已更新为:', data.layout);
+            window.location.reload();
+        } else {
+            console.error('更新布局失败:', data.message);
+        }
+    })
+    .catch(err => console.error('请求更新布局失败:', err));
 }
 
 // 格式化站点索引信息

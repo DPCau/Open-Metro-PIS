@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ config.app_name }}{{ config.title_separator }}{% block title %}{% endblock %}</title>
+    <link rel="preload" href="/static/font/font.ttf" as="font" type="font/ttf" crossorigin>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <style>
         @font-face {
@@ -11,20 +12,78 @@
             src: url('/static/font/font.ttf') format('truetype');
             font-weight: normal;
             font-style: normal;
+            font-display: block;
         }
         
         :root {
-            --theme-color: #9b5de5;
+            --theme-color: {{ line_color or '#9b5de5' }};
+            --header-text-color: #ffffff;
         }
         
         .header {
             background-color: var(--theme-color) !important;
+            background: var(--theme-color) !important;
+            color: var(--header-text-color) !important;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
+
+        .header .line-info {
+            color: var(--header-text-color) !important;
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+
+        /* 当背景为浅色时，调整 line-info 的背景色以增加对比度 */
+        [data-theme="light"] .header .line-info {
+            background-color: rgba(0, 0, 0, 0.1);
+        }
+
+        .header .title, 
+        .header .title span:not(.transfer-badge), 
+        .header .title div:not(.next-transfer-badges):not(.transfer-badge),
+        .header .time,
+        .header .line-sub-info,
+        .header .line-sub-info * {
+            color: var(--header-text-color) !important;
+        }
+
+        /* 确保 door-info 文字始终为白色，因为它有红色背景 */
+        .header .door-info {
+            color: white !important;
+        }
+
+        .header .line-sub-info {
+            opacity: 0.9;
+        }
+
         /* 覆盖头部左侧布局：上下一列，首行横排 */
         .header-left { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
         .header-left-row { display: flex; align-items: center; gap: 15px; }
-        .line-sub-info { display: block; font-size: 14px; color: #ffffffcc; }
     </style>
+    <script>
+        function updateHeaderContrast() {
+            const themeColor = "{{ line_color or '#9b5de5' }}";
+            const hex = themeColor.replace('#', '');
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            
+            // 使用 YIQ 亮度公式
+            const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+            // 调整阈值：原为 128，调高到 180 左右，使橙色、中等亮度绿色等偏向白色文字
+            const isLight = yiq >= 150;
+            
+            const textColor = isLight ? '#333333' : '#ffffff';
+            document.documentElement.style.setProperty('--header-text-color', textColor);
+            
+            if (isLight) {
+                document.documentElement.setAttribute('data-theme', 'light');
+            } else {
+                document.documentElement.removeAttribute('data-theme');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', updateHeaderContrast);
+    </script>
     <script src="{{ url_for('static', filename='js/common.js') }}"></script>
     {% block head %}{% endblock %}
 </head>
@@ -55,7 +114,15 @@
             <h1 class="title">{% block page_title %}{% endblock %}</h1>
         </div>
         <div class="header-right">
-            <span class="time" id="current-time">error:time</span>
+            <span class="time" id="current-time">00:00</span>
+            <script>
+                (function() {
+                    const now = new Date();
+                    const hours = now.getHours().toString().padStart(2, '0');
+                    const minutes = now.getMinutes().toString().padStart(2, '0');
+                    document.getElementById('current-time').textContent = hours + ':' + minutes;
+                })();
+            </script>
             {% if door_side %}<span class="door-info">{% if door_side == '本侧' %}本侧开门{% else %}对侧开门{% endif %}</span>{% endif %}
             {% if door_side %}<span class="door-info">Doors will open on {% if door_side == '本侧' %}this{% else %}the opposite{% endif %} side</span>{% endif %}
         </div>
@@ -66,26 +133,5 @@
     </main>
 
     {% block scripts %}{% endblock %}
-    <script>
-        // 实时更新时间显示
-        function updateTime() {
-            const now = new Date();
-            const hours = now.getHours().toString().padStart(2, '0');
-            const minutes = now.getMinutes().toString().padStart(2, '0');
-            const timeString = `${hours}:${minutes}`;
-            
-            const timeElement = document.getElementById('current-time');
-            if (timeElement) {
-                timeElement.textContent = timeString;
-            }
-        }
-        
-        // 页面加载时立即更新时间
-        document.addEventListener('DOMContentLoaded', function() {
-            updateTime();
-            // 每分钟更新一次时间
-            setInterval(updateTime, 60000);
-        });
-    </script>
 </body>
 </html>

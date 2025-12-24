@@ -1,0 +1,8 @@
+{
+    "line_name": "line_1",
+    "route_name": "route1",
+    "next_station": "韦家碾",
+    "direction": 0,
+    "door_side": "本侧",
+    "current_carriage": 3
+}

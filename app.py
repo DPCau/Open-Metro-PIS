@@ -2,6 +2,37 @@ from flask import Flask, render_template, jsonify, request
 import os
 import sys
 import json
+import re
+
+def custom_json_dumps(data):
+    """自定义JSON序列化，使 stations 列表不换行"""
+    # 先生成标准的缩进 JSON
+    json_str = json.dumps(data, ensure_ascii=False, indent=2)
+    
+    # 使用正则表达式匹配 stations 数组并将其转换为单行
+    # 匹配模式: "stations": [ 后面跟着换行和缩进，直到 ]
+    def shrink_list(match):
+        list_content = match.group(0)
+        # 移除换行和多余空格
+        shrunk = re.sub(r'\n\s*', ' ', list_content)
+        # 修复逗号后的空格
+        shrunk = re.sub(r',\s*', ', ', shrunk)
+        # 移除数组首尾的空格
+        shrunk = shrunk.replace('[ ', '[').replace(' ]', ']')
+        return shrunk
+
+    # 针对 stations 字段进行处理
+    pattern = r'"stations":\s*\[[^\]]*\]'
+    json_str = re.sub(pattern, shrink_list, json_str)
+    
+    return json_str
+
+# 将原有的 json.dump 替换为使用自定义序列化
+def save_json_file(file_path, data):
+    """保存JSON文件并应用自定义格式"""
+    formatted_json = custom_json_dumps(data)
+    with open(file_path, 'w', encoding='utf-8') as f:
+        f.write(formatted_json)
 
 # 将tools目录加入路径以便导入RouteTools
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tools'))
@@ -81,20 +112,311 @@ except Exception as e:
     print(f"初始化RouteTools失败: {e}")
 
 # 模拟当前状态数据
-current_state = {
-    'line_name': 'line_7',
-    'route_name': 'route1',
-    'next_station': '火车南站',
-    'direction':0, # 方向：0与数据文件顺序一致，1为反向（显示反转）
-    'door_side': '本侧',  # 本侧或对侧
-    'current_carriage': 3
-}
+STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'current_state.json')
+
+def load_current_state():
+    """从JSON文件加载当前状态"""
+    default_state = {
+        'line_name': '',
+        'route_name': 'route1',
+        'next_station': '',
+        'direction': 0,
+        'door_side': '本侧',
+        'current_carriage': 0
+    }
+    try:
+        if os.path.exists(STATE_FILE):
+            with open(STATE_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"加载状态文件失败: {e}")
+    return default_state
+
+def save_current_state(state):
+    """将当前状态保存到JSON文件"""
+    try:
+        with open(STATE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(state, f, ensure_ascii=False, indent=4)
+    except Exception as e:
+        print(f"保存状态文件失败: {e}")
+
+current_state = load_current_state()
+
+
+@app.route('/api/state', methods=['GET'])
+def get_state():
+    """获取当前状态"""
+    return jsonify(current_state)
+
+@app.route('/api/state/next', methods=['POST'])
+def next_station():
+    """切换到下一站"""
+    global current_state
+    line_name = current_state['line_name']
+    route_name = current_state['route_name']
+    direction = current_state.get('direction', 0)
+    
+    line_info = None
+    if tools is not None:
+        line_info = tools.get_line_map_info(line_name, route_name)
+    if line_info is None:
+        line_info = fallback_get_line_map_info(line_name, route_name)
+    
+    if not line_info:
+        return jsonify({'status': 'error', 'message': '无法获取线路信息'}), 500
+    
+    station_names = [s['station_name'] for s in line_info]
+    if direction == 1:
+        station_names.reverse()
+    
+    current_idx = -1
+    try:
+        current_idx = station_names.index(current_state['next_station'])
+    except ValueError:
+        current_idx = 0
+    
+    next_idx = (current_idx + 1) % len(station_names)
+    current_state['next_station'] = station_names[next_idx]
+    save_current_state(current_state)
+    return jsonify(current_state)
+
+@app.route('/api/state/prev', methods=['POST'])
+def prev_station():
+    """切换到上一站"""
+    global current_state
+    line_name = current_state['line_name']
+    route_name = current_state['route_name']
+    direction = current_state.get('direction', 0)
+    
+    line_info = None
+    if tools is not None:
+        line_info = tools.get_line_map_info(line_name, route_name)
+    if line_info is None:
+        line_info = fallback_get_line_map_info(line_name, route_name)
+    
+    if not line_info:
+        return jsonify({'status': 'error', 'message': '无法获取线路信息'}), 500
+    
+    station_names = [s['station_name'] for s in line_info]
+    if direction == 1:
+        station_names.reverse()
+    
+    current_idx = -1
+    try:
+        current_idx = station_names.index(current_state['next_station'])
+    except ValueError:
+        current_idx = 0
+    
+    prev_idx = (current_idx - 1 + len(station_names)) % len(station_names)
+    current_state['next_station'] = station_names[prev_idx]
+    save_current_state(current_state)
+    return jsonify(current_state)
+
+@app.route('/api/state/reverse', methods=['POST'])
+def reverse_direction():
+    """切换运行方向 (R键)"""
+    global current_state
+    current_state['direction'] = 1 if current_state.get('direction', 0) == 0 else 0
+    save_current_state(current_state)
+    return jsonify(current_state)
+
+@app.route('/api/state/route/next', methods=['POST'])
+def next_route():
+    """切换到下一个路由 (下方向键)"""
+    global current_state
+    line_name = current_state['line_name']
+    
+    # 获取该线路下所有的 route 列表
+    data_dir = get_data_dir()
+    route_file = os.path.join(data_dir, 'route.json')
+    try:
+        with open(route_file, 'r', encoding='utf-8') as f:
+            route_data = json.load(f)
+            services = route_data.get(line_name, {}).get('services', [])
+            route_names = [s.get('type') or s.get('service_name') for s in services]
+            
+            if not route_names:
+                return jsonify({'status': 'error', 'message': '无可用路由'}), 404
+                
+            current_route = current_state['route_name']
+            try:
+                curr_idx = route_names.index(current_route)
+            except ValueError:
+                curr_idx = 0
+                
+            next_idx = (curr_idx + 1) % len(route_names)
+            current_state['route_name'] = route_names[next_idx]
+            save_current_state(current_state)
+            return jsonify(current_state)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/state/line/next', methods=['POST'])
+def next_line():
+    """切换到下一条线路 (l 键)"""
+    global current_state
+    data_dir = get_data_dir()
+    route_file = os.path.join(data_dir, 'route.json')
+    try:
+        with open(route_file, 'r', encoding='utf-8') as f:
+            route_data = json.load(f)
+            line_names = list(route_data.keys())
+            
+            if not line_names:
+                return jsonify({'status': 'error', 'message': '无可用线路'}), 404
+                
+            current_line = current_state['line_name']
+            try:
+                curr_idx = line_names.index(current_line)
+            except ValueError:
+                curr_idx = 0
+                
+            next_idx = (curr_idx + 1) % len(line_names)
+            new_line = line_names[next_idx]
+            
+            # 切换线路时，默认选择该线路的第一个路由和第一站
+            new_services = route_data.get(new_line, {}).get('services', [])
+            new_route = new_services[0].get('type') or new_services[0].get('service_name') if new_services else 'route1'
+            
+            # 获取新线路的车站列表
+            line_info = None
+            if tools is not None:
+                line_info = tools.get_line_map_info(new_line, new_route)
+            if line_info is None:
+                line_info = fallback_get_line_map_info(new_line, new_route)
+            
+            new_station = line_info[0]['station_name'] if line_info else ''
+            
+            current_state['line_name'] = new_line
+            current_state['route_name'] = new_route
+            current_state['next_station'] = new_station
+            save_current_state(current_state)
+            return jsonify(current_state)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/state/line/prev', methods=['POST'])
+def prev_line():
+    """切换到上一条线路 (k 键)"""
+    global current_state
+    data_dir = get_data_dir()
+    route_file = os.path.join(data_dir, 'route.json')
+    try:
+        with open(route_file, 'r', encoding='utf-8') as f:
+            route_data = json.load(f)
+            line_names = list(route_data.keys())
+            
+            if not line_names:
+                return jsonify({'status': 'error', 'message': '无可用线路'}), 404
+                
+            current_line = current_state['line_name']
+            try:
+                curr_idx = line_names.index(current_line)
+            except ValueError:
+                curr_idx = 0
+                
+            prev_idx = (curr_idx - 1 + len(line_names)) % len(line_names)
+            new_line = line_names[prev_idx]
+            
+            # 切换线路时，默认选择该线路的第一个路由和第一站
+            new_services = route_data.get(new_line, {}).get('services', [])
+            new_route = new_services[0].get('type') or new_services[0].get('service_name') if new_services else 'route1'
+            
+            # 获取新线路的车站列表
+            line_info = None
+            if tools is not None:
+                line_info = tools.get_line_map_info(new_line, new_route)
+            if line_info is None:
+                line_info = fallback_get_line_map_info(new_line, new_route)
+            
+            new_station = line_info[0]['station_name'] if line_info else ''
+            
+            current_state['line_name'] = new_line
+            current_state['route_name'] = new_route
+            current_state['next_station'] = new_station
+            save_current_state(current_state)
+            return jsonify(current_state)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/state/layout', methods=['POST'])
+def update_layout():
+    """更新当前线路的布局模式 (i, o, p 键)"""
+    global current_state
+    mode = request.json.get('mode') # 'one_line', 'two_line', 'auto'
+    if mode not in ['one_line', 'two_line', 'auto']:
+        return jsonify({'status': 'error', 'message': '无效的布局模式'}), 400
+        
+    line_name = current_state['line_name']
+    data_dir = get_data_dir()
+    route_file = os.path.join(data_dir, 'route.json')
+    
+    try:
+        with open(route_file, 'r', encoding='utf-8') as f:
+            route_data = json.load(f)
+            
+        if line_name in route_data:
+            # 环线特殊处理：如果是环线且尝试设置为单行，则强制设为双行
+            is_loop = route_data[line_name].get('type') == 'loop'
+            if is_loop and mode == 'one_line':
+                mode = 'two_line'
+                
+            route_data[line_name]['layout'] = mode
+            
+            save_json_file(route_file, route_data)
+                
+            # 立即失效缓存，确保页面刷新后读取到最新数据
+            if 'route.json' in _DATA_CACHE:
+                del _DATA_CACHE['route.json']
+            
+            # 如果 RouteTools 实例存在，也需要重载其数据
+            if tools is not None:
+                try:
+                    tools._load_data()
+                except Exception as e:
+                    print(f"重载 RouteTools 数据失败: {e}")
+                
+            return jsonify({'status': 'success', 'layout': mode})
+        else:
+            return jsonify({'status': 'error', 'message': '未找到线路'}), 404
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
+@app.route('/api/state/route/prev', methods=['POST'])
+def prev_route():
+    """切换到上一个路由 (上方向键)"""
+    global current_state
+    line_name = current_state['line_name']
+    
+    data_dir = get_data_dir()
+    route_file = os.path.join(data_dir, 'route.json')
+    try:
+        with open(route_file, 'r', encoding='utf-8') as f:
+            route_data = json.load(f)
+            services = route_data.get(line_name, {}).get('services', [])
+            route_names = [s.get('type') or s.get('service_name') for s in services]
+            
+            if not route_names:
+                return jsonify({'status': 'error', 'message': '无可用路由'}), 404
+                
+            current_route = current_state['route_name']
+            try:
+                curr_idx = route_names.index(current_route)
+            except ValueError:
+                curr_idx = 0
+                
+            prev_idx = (curr_idx - 1 + len(route_names)) % len(route_names)
+            current_state['route_name'] = route_names[prev_idx]
+            save_current_state(current_state)
+            return jsonify(current_state)
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 
 @app.route('/')
 def index():
     """首页 - 默认显示下一站信息（适配direction与终点展示）"""
-    # 主题色
+    # 获取线路主题色
     line_color = None
     try:
         if tools is not None:
@@ -186,6 +508,15 @@ def index():
                 if n == name:
                     return s
             return None
+        def _service_group(raw):
+            try:
+                g = (raw or {}).get('group', '0')
+                if g is None:
+                    return '0'
+                g = str(g).strip()
+                return g if g else '0'
+            except Exception:
+                return '0'
         # 环线文案：基于方向（数据为外环方向，direction=1 反向视为内环）
         def _ring_label_by_direction(dir_val):
             try:
@@ -243,10 +574,12 @@ def index():
                 pass
             return '环线运行'
         main_raw = _raw_service_by_name(route_name)
+        main_group = _service_group(main_raw)
         main_terminal_field = (main_raw or {}).get('terminal_station')
         main_has_terminal = bool((main_terminal_field or '').strip())
         route_services.append({
             'name': route_name,
+            'group': main_group,
             'is_main': True,
             'is_loop': (line_type == 'loop'),
             'ring_label': _ring_label_by_direction(direction) if line_type == 'loop' else '',
@@ -279,10 +612,12 @@ def index():
                     start_other = other_names[0] if len(other_names) > 0 else ''
                     end_other = other_names[-1] if len(other_names) > 0 else ''
                 raw = _raw_service_by_name(r)
+                other_group = _service_group(raw)
                 terminal_field = (raw or {}).get('terminal_station')
                 has_terminal = bool((terminal_field or '').strip())
                 route_services.append({
                     'name': r,
+                    'group': other_group,
                     'is_main': False,
                     'is_loop': (line_type == 'loop'),
                     'ring_label': _ring_label_by_direction(direction) if line_type == 'loop' else '',
@@ -369,6 +704,16 @@ def index():
 def line_map():
     """线路图页面（基于真实数据渲染）"""
     try:
+        # 获取线路主题色
+        line_color = None
+        try:
+            if tools is not None:
+                line_color = tools.get_line_color(current_state['line_name'])
+        except Exception:
+            pass
+        if line_color is None:
+            line_color = fallback_get_line_color(current_state['line_name'])
+
         # 获取翻译数据
         trans_data = _get_trans_data()
         
@@ -378,13 +723,11 @@ def line_map():
         line_info = None
         line_display_name = line_name
         line_en_name = None
-        line_color = None
         if tools is not None:
             try:
                 line_info = tools.get_line_map_info(line_name, route_name)
                 line_display_name = tools.get_line_display_name(line_name)
                 line_en_name = tools.get_line_en_name(line_name)
-                line_color = tools.get_line_color(line_name)
             except Exception as e:
                 print(f"从RouteTools获取线路图信息失败: {e}")
         
@@ -394,12 +737,12 @@ def line_map():
                 line_info = fallback_get_line_map_info(line_name, route_name)
                 line_display_name = fallback_get_line_display_name(line_name)
                 line_en_name = fallback_get_line_en_name(line_name)
-                line_color = fallback_get_line_color(line_name)
             except Exception as e:
                 print(f"从数据文件获取线路图信息失败: {e}")
         
         # 子路线检测：若当前route是某一更大route的子集，则展示该大路线，并将非当前route的站点标记为灰色静止
         full_route_mode = False
+        current_route_stations = []
         try:
             # 当前路线的站序
             current_route_stations = [s.get('station_name') for s in (line_info or [])]
@@ -482,7 +825,7 @@ def line_map():
                 # 注意：即便未找到大路线也注入当前站序，用于普通模式
         except Exception as e:
             print(f"子路线检测失败: {e}")
-        
+            
         # 根据direction控制显示方向：0与数据一致，1反向显示
         is_reversed = False
         try:

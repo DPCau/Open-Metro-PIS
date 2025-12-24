@@ -50,7 +50,7 @@
         position: relative;
     }
     
-    :root { --theme-color: #9b5de5; --dot-adjust: 2.5px; --rail-adjust: -2px; --rail-thickness: 10px; }
+    :root { --dot-adjust: 2.5px; --rail-adjust: -2px; --rail-thickness: 10px; }
     .route-line::before {
         content: '';
         position: absolute;
@@ -168,8 +168,18 @@
     <!-- 路线信息展示（nextstation功能） -->
     <div class="route-info" style="--theme-color: {{ line_color or '#9b5de5' }};">
         {% if route_services %}
-            {% set has_multiple = route_services|length > 1 %}
+            {% set ns = namespace(active_group='0') %}
             {% for svc in route_services %}
+                {% if svc.is_main %}
+                    {% set ns.active_group = svc.group %}
+                {% endif %}
+            {% endfor %}
+            {% set route_services_display = route_services | selectattr('group', 'equalto', ns.active_group) | list %}
+            {% if route_services_display|length == 0 %}
+                {% set route_services_display = route_services %}
+            {% endif %}
+            {% set has_multiple = route_services_display|length > 1 %}
+            {% for svc in route_services_display %}
                 <div class="route-label {{ 'active' if svc.is_main else '' }}">运营线路{% if has_multiple %}{{ loop.index }}{% endif %}</div>
                 <div class="route-line {{ 'active' if svc.is_main else '' }} {{ 'loop' if svc.is_loop else '' }} {{ 'single' if svc.is_loop and not svc.has_terminal else '' }}" data-total="{{ svc.total }}" data-stations="{{ (svc.stations or []) | join('|') }}" data-next="{{ next_station }}" data-direction="{{ direction }}" data-terminal="{{ svc.end if svc.is_loop else terminal_station }}" data-is-loop="{{ 1 if svc.is_loop else 0 }}" data-has-terminal="{{ 1 if svc.has_terminal else 0 }}">
                      <div class="terminal-station">
@@ -233,11 +243,7 @@
         {% endif %}
     </div>
     
-    <!-- 导航按钮 -->
-    <div class="navigation-buttons" style="margin-top: 30px; display: flex; justify-content: center; gap: 20px;">
-    <button class="btn" onclick="navigateTo('/line_map')">查看线路图</button>
-    <button class="btn" onclick="navigateTo('/line_detail')">线路详情</button>
-</div>
+
 {% endblock %}
 
 {% block scripts %}
