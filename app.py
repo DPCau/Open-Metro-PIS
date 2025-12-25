@@ -50,6 +50,28 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
 
 # 加载应用配置
+def load_global_config():
+    """加载全局根目录配置文件"""
+    config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'global_config.json')
+    default_config = {
+        "watermark_enabled": False,
+        "watermark_text": "水印文字",
+        "hint_enabled": False,
+        "hint_text": "提示文字"
+    }
+    try:
+        if os.path.exists(config_path):
+            with open(config_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return default_config
+
+@app.context_processor
+def inject_global_config():
+    """将全局配置注入所有模板"""
+    return dict(global_config=load_global_config())
+
 def get_current_city():
     """获取当前配置的城市"""
     config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'city_config.json')

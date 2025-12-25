@@ -180,6 +180,177 @@
                 align-items: center;
             }
         }
+
+        /* 全局水印与提示信息样式 */
+        .global-overlay {
+            position: fixed;
+            top: -20%;
+            left: -20%;
+            width: 140%;
+            height: 140%;
+            pointer-events: none;
+            z-index: 999999;
+            overflow: hidden;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+            align-content: space-around;
+            transform: rotate(-30deg); /* 整体旋转 */
+        }
+
+        .watermark-item {
+            font-size: 28px;
+            font-weight: bold;
+            color: rgba(0, 0, 0, 0.5); /* 保持原有颜色和透明度 */
+            white-space: nowrap; /* 不自动换行 */
+            user-select: none;
+            text-transform: uppercase;
+            padding: 60px; /* 水平竖直间距 */
+            flex-shrink: 0;
+        }
+
+        .global-hint {
+            position: fixed;
+            bottom: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.6);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            backdrop-filter: blur(4px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            transition: opacity 0.3s;
+            white-space: pre-wrap; /* 支持手动换行且自动换行 */
+            word-wrap: break-word;
+            text-align: left; /* 改回左对齐 */
+            z-index: 1000000;
+            width: fit-content;
+            max-width: 90%; /* 移动端自动换行保护 */
+        }
+
+        [data-theme="light"] .watermark-item {
+            color: rgba(0, 0, 0, 0.5);
+        }
+        
+        [data-theme="dark"] .watermark-item {
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        /* 移动端控制悬浮窗 */
+        .mobile-controls {
+            display: none; /* 默认隐藏 */
+            position: fixed;
+            right: 20px;
+            bottom: 80px;
+            z-index: 2000000;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: #222; /* 不透明深色背景 */
+            padding: 15px;
+            border-radius: 16px;
+            border: 2px solid var(--theme-color); /* 使用主题色描边 */
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .control-section {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .control-section-title {
+            color: #aaa;
+            font-size: 12px;
+            font-weight: bold;
+            padding-left: 4px;
+            border-left: 3px solid var(--theme-color);
+            line-height: 1;
+        }
+
+        .control-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 8px;
+            background: #333;
+            color: white;
+            border: 1px solid #444;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            pointer-events: auto;
+            font-size: 18px;
+        }
+
+        .control-btn:active {
+            background: var(--theme-color);
+            border-color: white;
+        }
+
+        .control-toggle {
+            width: 56px;
+            height: 56px;
+            border-radius: 28px;
+            background: var(--theme-color);
+            color: white;
+            border: 3px solid white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+            cursor: pointer;
+            font-size: 28px;
+            pointer-events: auto;
+        }
+
+        .control-menu {
+            display: none;
+            background: #222;
+            padding: 15px;
+            border-radius: 16px;
+            border: 2px solid var(--theme-color);
+            flex-direction: column;
+            gap: 15px;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+
+        .control-menu.active {
+            display: flex;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        @media (max-width: 1200px) {
+            .mobile-controls {
+                display: flex;
+            }
+            .wide-only {
+                display: none !important;
+            }
+            .narrow-only {
+                display: block !important;
+            }
+        }
+
+        .wide-only {
+            display: block;
+        }
+        .narrow-only {
+            display: none;
+        }
     </style>
     <script src="{{ url_for('static', filename='js/common.js') }}"></script>
     {% block head %}{% endblock %}
@@ -241,5 +412,84 @@
     </main>
 
     {% block scripts %}{% endblock %}
+
+    {# 全局叠加层：水印与提示信息 #}
+    {% if global_config %}
+        {% if global_config.watermark_enabled %}
+        <div class="global-overlay">
+            {% for i in range(20) %}
+            <div class="watermark-item">{{ global_config.watermark_text }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if global_config.hint_enabled %}
+        <div class="global-hint wide-only" id="global-hint-wide">{{ global_config.hint_text_wide }}</div>
+        <div class="global-hint narrow-only" id="global-hint-narrow">{{ global_config.hint_text_narrow }}</div>
+        {% endif %}
+
+        {# 移动端悬浮控制按钮 #}
+        <div class="mobile-controls">
+            <div class="control-menu" id="control-menu">
+                <!-- 页面切换 -->
+                <div class="control-section">
+                    <div class="control-section-title">页面跳转</div>
+                    <div class="control-row">
+                        <button class="control-btn" onclick="triggerKey('1')" title="首页">🏠</button>
+                        <button class="control-btn" onclick="triggerKey('2')" title="地图">🗺️</button>
+                        <button class="control-btn" onclick="triggerKey('3')" title="详情">📋</button>
+                        <button class="control-btn" onclick="triggerKey('4')" title="到站">🔔</button>
+                    </div>
+                </div>
+                <!-- 站点切换 -->
+                <div class="control-section">
+                    <div class="control-section-title">站点/线路</div>
+                    <div class="control-row">
+                        <button class="control-btn" onclick="triggerKey('k')" title="上条线路">⏮️</button>
+                        <button class="control-btn" onclick="triggerKey('l')" title="下条线路">⏭️</button>
+                        <button class="control-btn" onclick="triggerKey('a')" title="上一站">⬅️</button>
+                        <button class="control-btn" onclick="triggerKey('d')" title="下一站">➡️</button>
+                    </div>
+                </div>
+                <!-- 交路切换 -->
+                <div class="control-section">
+                    <div class="control-section-title">交路/方向/功能</div>
+                    <div class="control-row">
+                        <button class="control-btn" onclick="triggerKey('w')" title="上个路由">🔼</button>
+                        <button class="control-btn" onclick="triggerKey('s')" title="下个路由">🔽</button>
+                        <button class="control-btn" onclick="triggerKey('r')" title="切换方向">🔄</button>
+                        <button class="control-btn" onclick="triggerKey('t')" title="开门侧">🚪</button>
+                    </div>
+                </div>
+                <!-- 显示模式 -->
+                <div class="control-section">
+                    <div class="control-section-title">显示模式/预设</div>
+                    <div class="control-row">
+                        <button class="control-btn" onclick="triggerKey('i')" title="模式I">ℹ️</button>
+                        <button class="control-btn" onclick="triggerKey('o')" title="模式O">🅾️</button>
+                        <button class="control-btn" onclick="triggerKey('p')" title="模式P">🅿️</button>
+                        <button class="control-btn" onclick="triggerKey('f')" title="预设下一站">📍</button>
+                    </div>
+                </div>
+            </div>
+            <button class="control-toggle" onclick="toggleControlMenu()">🎮</button>
+        </div>
+
+        <script>
+            function toggleControlMenu() {
+                const menu = document.getElementById('control-menu');
+                menu.classList.toggle('active');
+            }
+
+            function triggerKey(key) {
+                const event = new KeyboardEvent('keydown', {
+                    key: key,
+                    bubbles: true,
+                    cancelable: true
+                });
+                document.dispatchEvent(event);
+            }
+        </script>
+    {% endif %}
 </body>
 </html>

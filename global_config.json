@@ -1,0 +1,7 @@
+{
+    "watermark_enabled": false,
+    "watermark_text": "PIS系统 本部署仅用于在线演示 严禁用于其它用途",
+    "hint_enabled": false,
+    "hint_text_wide": "项目开源地址：https://github.com/DPCau/Open-Metro-PIS\n操作指引：[A/D] 切换上下站，[W/S] 切换交路，[K/L] 切换线路，[R] 切换运行方向，[T] 切换开门方向，[F] 切换下一站但不立即刷新\n[1/2/3/4] 切换到线路信息显示/路线地图显示/线路详细信息显示/到达站显示\n[I/O/P]在线路地图页(对应数字键`2`)分别切换单行模式、双行模式与自动模式（环线下按 [I]也切换到双行)\n[I/O]在线路详情页(对应数字键`3`)，使用分别切换默认模式与列模式",
+    "hint_text_narrow": "项目开源地址：https://github.com/DPCau/Open-Metro-PIS\n点击右下角🎮按钮进行操作"
+}
