@@ -1,7 +1,7 @@
 {
-    "line_name": "line_5",
+    "line_name": "line_4",
     "route_name": "route1",
-    "next_station": "华桂路",
+    "next_station": "万盛",
     "direction": 0,
     "door_side": "本侧",
     "current_carriage": 3

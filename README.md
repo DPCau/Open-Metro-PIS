@@ -1,7 +1,12 @@
 # 轨道交通/地铁PIS车内导视系统
 
-[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/)
-![Maintenance](https://img.shields.io/badge/Maintenance-Solo-blue)
+<div align="center">
+
+[![License: CC BY-NC-SA 4.0](https://img.shields.io/badge/License-CC%20BY--NC--SA%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc-sa/4.0/) ![Maintenance](https://img.shields.io/badge/Maintenance-Solo-blue)
+
+[简体中文] | [[English](./README_en.md)]
+
+</div>
 
 ## 声明
 
@@ -52,6 +57,7 @@
 1. **下一站信息显示**：展示当前线路、下一站信息、开门方向等
 2. **线路图显示**：展示完整线路图和当前位置
 3. **站点详情显示**：展示站点的换乘信息
+4. **到达站x显示**：展示到达目标站点、开门方向等信息
 
 ## 效果展示
 
@@ -102,7 +108,7 @@
 
 - 普通线路
   - 单行模式 one_line
-    > 当行模式下所有站在同一行显示不会换行，适合站数量较少的线路
+    > 单行模式下所有站在同一行显示不会换行，适合站数量较少的线路
     > 同时**只有**单行模式支持**分岔路**的显示
     - 普通
       - 大交路
