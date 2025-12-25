@@ -187,10 +187,38 @@
         color: #666;
         margin-top: 2px;
     }
-    /* 已过站：将中文与英文站名统一置灰 */
+    /* 站点编号药丸样式 */
+    .station-codes {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 4px;
+        margin-top: 6px;
+        width: 100%;
+        max-width: 110px; /* 限制宽度以强制每行最多展示约2个 */
+        margin-left: auto;
+        margin-right: auto;
+    }
+    .station-code-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 1px 6px;
+        border: 1.5px solid var(--pill-color, var(--theme-color));
+        border-radius: 10px;
+        font-size: 10px;
+        color: var(--pill-color, var(--theme-color));
+        background-color: transparent;
+        min-width: 38px;
+        line-height: 1;
+        font-weight: bold;
+    }
+    /* 已过站：将中文与英文站名及编号统一置灰 */
     .station-circle.passed ~ .station-labels .station-name,
-    .station-circle.passed ~ .station-labels .station-name.en {
+    .station-circle.passed ~ .station-labels .station-name.en,
+    .station-circle.passed ~ .station-labels .station-code-pill {
         color: #999999;
+        border-color: #999999;
         font-weight: normal;
     }
     .transfer-badges {
@@ -250,11 +278,156 @@
     .direction-arrow.black { color: var(--arrow-color-black, #000); }
     .direction-arrow.gray { color: var(--arrow-color-gray, #555); }
     .direction-arrow.red { color: var(--arrow-color-red, #ff3b30); animation: blink var(--arrow-blink-duration, 1s) infinite alternate; }
+
+    .container.detail-style-column .local-line-container { display: none; }
+    .container.detail-style-default .detail-column-container { display: none; }
+
+    .detail-column-container {
+        width: 100%;
+        max-width: 1200px; /* 进一步收窄以居中 */
+        margin: 0 auto;
+        padding: 16px 20px;
+    }
+    .detail-column {
+        display: flex;
+        gap: 26px;
+        align-items: flex-start;
+        width: 100%;
+        --theme-color: {{ line_color or '#9b5de5' }};
+    }
+    .detail-column-rail {
+        width: 22px;
+        border-radius: 14px;
+        background: linear-gradient(180deg, rgba(0,0,0,0.05), rgba(0,0,0,0.02));
+        position: relative;
+        flex: 0 0 22px;
+        align-self: stretch;
+    }
+    .detail-column-rail::after {
+        content: '';
+        position: absolute;
+        inset: 10px 3px;
+        border-radius: 12px;
+        background: var(--theme-color);
+        opacity: 0.9;
+    }
+    .detail-column-list {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        overflow: hidden; /* 取消滚动条 */
+        padding-right: 10px;
+    }
+    .detail-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 28px;
+        min-height: 64px; /* 固定最小高度，防止高度跳动 */
+    }
+    .detail-row-left {
+        display: flex;
+        align-items: center; /* 改为居中对齐 */
+        gap: 22px;
+        min-width: 0;
+    }
+    .detail-marker {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        background: #fff;
+        border: 4px solid var(--theme-color);
+        flex: 0 0 auto;
+        position: relative;
+        z-index: 2;
+    }
+    .detail-column-container .detail-row .detail-marker::after {
+        content: '';
+        position: absolute;
+        top: 14px; /* 从圆圈底部开始 */
+        left: 50%;
+        transform: translateX(-50%);
+        width: 4px;
+        height: calc(100% + 50px); /* 延伸到下一行 */
+        background: #eee;
+        z-index: 1;
+    }
+    .detail-column-container .detail-row:last-child .detail-marker::after {
+        display: none;
+    }
+    .detail-name {
+        font-size: 36px;
+        font-weight: 800;
+        color: #111;
+        line-height: 1.05;
+        white-space: nowrap;
+    }
+    .detail-name-en {
+        font-size: 18px; /* 减小字体大小 */
+        color: #222;
+        line-height: 1.05;
+        white-space: nowrap;
+        /* 取消下划线 */
+    }
+    .detail-row-right {
+        display: inline-flex;
+        align-items: center;
+        gap: 14px;
+        flex: 0 0 auto;
+    }
+    .detail-transfer-label {
+        display: flex;
+        flex-direction: column;
+        line-height: 1.05;
+        color: #111;
+        font-size: 22px;
+        text-align: right;
+    }
+    .detail-transfer-label .en {
+        font-size: 16px;
+        opacity: 0.85;
+    }
+    .detail-transfer-badges {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .detail-column-container .transfer-badge {
+        width: 44px;
+        height: 44px;
+        border-radius: 8px;
+        font-size: 22px;
+    }
+    .detail-column-container .transfer-badge.wide {
+        height: 44px;
+        border-radius: 10px;
+        padding: 0 10px;
+        font-size: 18px;
+    }
+    .detail-row.is-next .detail-name,
+    .detail-row.is-next .detail-name-en {
+        color: #ff3b30;
+    }
+    .detail-row.is-next .detail-marker {
+        border-color: #ff3b30;
+        box-shadow: 0 0 0 6px rgba(255,59,48,0.18);
+    }
+    .detail-row.is-passed .detail-name,
+    .detail-row.is-passed .detail-name-en {
+        color: #9a9a9a;
+        font-weight: 600;
+    }
+    .detail-row.is-passed .detail-marker {
+        border-color: #c9c9c9;
+        background: #f3f3f3;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container detail-style-{{ detail_style|default('default') }}">
     <div class="local-line-container">
         <div class="local-line" id="local-line" style="--theme-color: {{ line_color or '#9b5de5' }};">
             <div class="local-line-row" id="local-line-row">
@@ -263,6 +436,117 @@
         </div>
     </div>
 
+    <div class="detail-column-container">
+        <div class="detail-column" style="--theme-color: {{ line_color or '#9b5de5' }};">
+            <div class="detail-column-rail"></div>
+            <div class="detail-column-list">
+                {% if direction|int == 0 %}
+                    {% set directional_base = line_info or [] %}
+                {% else %}
+                    {% set directional_base = (line_info or [])|reverse|list %}
+                {% endif %}
+
+                {% set base_len = directional_base|length %}
+                {% if is_loop and loop_has_terminal and loop_terminal_station and base_len > 0 %}
+                    {% set ns_term = namespace(idx=-1, found=false) %}
+                    {% for st in directional_base %}
+                        {% if (not ns_term.found) and st.station_name == loop_terminal_station %}
+                            {% set ns_term.idx = loop.index0 %}
+                            {% set ns_term.found = true %}
+                        {% endif %}
+                    {% endfor %}
+                    {% if ns_term.idx >= 0 %}
+                        {% set start_offset = (ns_term.idx + 1) % base_len %}
+                    {% else %}
+                        {% set start_offset = 0 %}
+                    {% endif %}
+                    {% set directional_info = directional_base[start_offset:] + directional_base[:start_offset] %}
+                {% else %}
+                    {% set directional_info = directional_base %}
+                {% endif %}
+
+                {% set total_stations = directional_info|length %}
+                {% if total_stations > 0 %}
+                    {% set ns_next = namespace(idx=0, found=false) %}
+                    {% for st in directional_info %}
+                        {% if (not ns_next.found) and st.station_name == next_station %}
+                            {% set ns_next.idx = loop.index0 %}
+                            {% set ns_next.found = true %}
+                        {% endif %}
+                    {% endfor %}
+                    {% set current_next_idx = ns_next.idx %}
+                {% else %}
+                    {% set current_next_idx = 0 %}
+                {% endif %}
+
+                {% if is_loop and not loop_has_terminal and total_stations > 0 %}
+                    {# 无终点环线：处理循环切片 #}
+                    {% set start_idx = (current_next_idx - 1) %}
+                    
+                    {% for i in range(5) %}
+                        {% set actual_idx = (start_idx + i) % total_stations %}
+                        {% if actual_idx < 0 %}
+                            {% set actual_idx = actual_idx + total_stations %}
+                        {% endif %}
+                        {% set s = directional_info[actual_idx] %}
+                        
+                        {% set is_next = (loop.index0 == 1) %}
+                        {% set is_passed = (loop.index0 == 0) %}
+                        <div class="detail-row{% if is_next %} is-next{% endif %}{% if is_passed %} is-passed{% endif %}">
+                            <div class="detail-row-left">
+                                <span class="detail-marker"></span>
+                                <span class="detail-name">{{ s.station_name }}</span>
+                                <span class="detail-name-en">{{ trans_data.get(s.station_name, s.station_name).replace('<br>', ' ') }}</span>
+                            </div>
+                            {% if s.transfer_badges and s.transfer_badges|length > 0 %}
+                                <div class="detail-row-right">
+                                    <div class="detail-transfer-label">
+                                        <span class="zh">换乘</span>
+                                        <span class="en">Transfer</span>
+                                    </div>
+                                    <div class="detail-transfer-badges">
+                                        {% for b in s.transfer_badges %}
+                                            <span class="transfer-badge {% if b.code|string|length > 1 %}wide{% endif %}" data-color="{{ b.color }}">{{ b.code }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    {# 普通线路或有终点环线：原有逻辑 #}
+                    {% set start_idx = (current_next_idx - 1) if (current_next_idx - 1) >= 0 else 0 %}
+                    {% set display_stations = directional_info[start_idx : start_idx + 5] %}
+
+                    {% for s in display_stations %}
+                        {% set loop_idx = start_idx + loop.index0 %}
+                        {% set is_next = (loop_idx == current_next_idx) %}
+                        {% set is_passed = (loop_idx < current_next_idx) %}
+                        <div class="detail-row{% if is_next %} is-next{% endif %}{% if is_passed %} is-passed{% endif %}">
+                            <div class="detail-row-left">
+                                <span class="detail-marker"></span>
+                                <span class="detail-name">{{ s.station_name }}</span>
+                                <span class="detail-name-en">{{ trans_data.get(s.station_name, s.station_name).replace('<br>', ' ') }}</span>
+                            </div>
+                            {% if s.transfer_badges and s.transfer_badges|length > 0 %}
+                                <div class="detail-row-right">
+                                    <div class="detail-transfer-label">
+                                        <span class="zh">换乘</span>
+                                        <span class="en">Transfer</span>
+                                    </div>
+                                    <div class="detail-transfer-badges">
+                                        {% for b in s.transfer_badges %}
+                                            <span class="transfer-badge {% if b.code|string|length > 1 %}wide{% endif %}" data-color="{{ b.color }}">{{ b.code }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
 
 </div>
 
@@ -274,6 +558,8 @@
 <script id="loop-has-terminal-data" type="application/json">{{ loop_has_terminal | tojson }}</script>
 <script id="loop-terminal-data" type="application/json">{{ loop_terminal_station | tojson }}</script>
 <script id="terminal-data" type="application/json">{{ terminal_station | tojson }}</script>
+<script id="station-data" type="application/json">{{ station_data | tojson }}</script>
+<script id="color-data" type="application/json">{{ color_data | tojson }}</script>
 
 
 
@@ -281,6 +567,9 @@
 
 {% block scripts %}
 <script>
+const gStationData = JSON.parse(document.getElementById('station-data')?.textContent || '{}');
+const gColorData = JSON.parse(document.getElementById('color-data')?.textContent || '{}');
+
 function setTransferBadgeColors() {
     document.querySelectorAll('.transfer-badge[data-color]').forEach(el => {
         const c = el.getAttribute('data-color');
@@ -290,6 +579,28 @@ function setTransferBadgeColors() {
 
 function createStationNode(station, isNext = false, isPassed = false) {
     const isTransfer = !!station.is_transfer || (Array.isArray(station.transfer_badges) && station.transfer_badges.length > 0);
+    
+    // 获取站点编号数据
+    const codesRaw = gStationData[station.station_name] || [];
+    
+    // 格式化编号：药丸内数字直接用竖线隔开，颜色与左边数字对应线的颜色一致
+    const pills = codesRaw.map(c => {
+        const lineCode = c[0] || '';
+        const stationNum = c[1] || '';
+        const text = `${lineCode}|${stationNum}`;
+        
+        // 匹配颜色逻辑：根据 lineCode 找 color.json 中的颜色
+        let pillColor = '';
+        if (lineCode) {
+            const key = lineCode.isdigit ? `line_${parseInt(lineCode)}` : `line_${lineCode}`;
+            // 兼容性处理：如果 key 是数字字符串则直接找，否则拼接
+            const directKey = `line_${lineCode.replace(/^0+/, '')}`; 
+            pillColor = gColorData[directKey] || gColorData[`line_${lineCode}`] || '';
+        }
+        
+        return { text, color: pillColor };
+    });
+
     const node = document.createElement('div');
     node.className = 'station-node';
     node.innerHTML = `
@@ -304,6 +615,11 @@ function createStationNode(station, isNext = false, isPassed = false) {
         <div class="station-labels">
             <div class="station-name ${isNext ? 'current' : ''}">${station.station_name}</div>
             <div class="station-name en">${station.station_en_name || station.station_name_en || ''}</div>
+            ${pills.length > 0 ? `
+                <div class="station-codes">
+                    ${pills.map(p => `<span class="station-code-pill" style="${p.color ? `--pill-color: ${p.color}` : ''}">${p.text}</span>`).join('')}
+                </div>
+            ` : ''}
         </div>
     `;
     return node;
@@ -410,7 +726,7 @@ function renderEndFades(nodes, showLeftFade, showRightFade) {
 }
 
 function layoutLocalRow() {
-    const lineInfo = JSON.parse(document.getElementById('line-info-data')?.textContent || 'null');
+    let lineInfo = JSON.parse(document.getElementById('line-info-data')?.textContent || 'null');
     const nextStationName = JSON.parse(document.getElementById('next-station-data')?.textContent || 'null');
     const direction = JSON.parse(document.getElementById('direction-data')?.textContent || '0');
     const isLoop = JSON.parse(document.getElementById('is-loop-data')?.textContent || 'false');
@@ -421,11 +737,82 @@ function layoutLocalRow() {
     const container = document.querySelector('.local-line-container');
     if (!Array.isArray(lineInfo) || !row || !container || !nextStationName) return;
 
+    // 针对有终点的环线，旋转 lineInfo 使其以“起点”开始
+    if (isLoop && loopHasTerminal && loopTerminalStation) {
+        let base = (direction === 0 || direction === '0') ? [...lineInfo] : [...lineInfo].reverse();
+        const termIdx = base.findIndex(s => s.station_name === loopTerminalStation);
+        if (termIdx >= 0) {
+            const startOffset = (termIdx + 1) % base.length;
+            lineInfo = base.slice(startOffset).concat(base.slice(0, startOffset));
+        }
+    }
+
     // 计算可见数量（至少3），按宽度增加
     const containerWidth = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
     const stationBlockWidth = 140; // 节点+标签的估算宽度
     const padding = 120;           // 左右边距合计（与 .local-line-row 的 padding 对齐）
     const maxByWidth = Math.max(3, Math.floor((containerWidth - padding) / stationBlockWidth));
+
+    const dir = (direction === 1 || direction === '1') ? 1 : 0;
+    if (isLoop && loopHasTerminal && loopTerminalStation) {
+        let ordered = lineInfo.slice();
+        if (dir === 1) ordered.reverse();
+        const n = ordered.length;
+        if (!n) return;
+
+        const tIdx = ordered.findIndex(s => s.station_name === loopTerminalStation);
+        if (tIdx >= 0) {
+            const startOffset = (tIdx + 1) % n;
+            ordered = ordered.slice(startOffset).concat(ordered.slice(0, startOffset));
+        }
+
+        let nextIdx = ordered.findIndex(s => s.station_name === nextStationName);
+        if (nextIdx < 0) nextIdx = 0;
+
+        const leftIdxs = [];
+        if (nextIdx - 1 >= 0) leftIdxs.push(nextIdx - 1);
+
+        const minLeftCount = leftIdxs.length;
+        const baseRightNeed = Math.max(1, 3 - minLeftCount);
+        const maxRightCapacity = Math.max(baseRightNeed, maxByWidth - minLeftCount);
+
+        const rightIdxs = [];
+        const maxCount = maxRightCapacity;
+        for (let idx = nextIdx; rightIdxs.length < maxCount && idx < n; idx++) {
+            rightIdxs.push(idx);
+            if (ordered[idx]?.station_name === loopTerminalStation) break;
+        }
+
+        row.innerHTML = '';
+        const nodes = [];
+        leftIdxs.forEach((idx) => {
+            const st = ordered[idx];
+            const node = createStationNode(st, false, true);
+            nodes.push(node);
+            row.appendChild(node);
+        });
+        rightIdxs.forEach((idx) => {
+            const st = ordered[idx];
+            const isNext = (idx === nextIdx);
+            const node = createStationNode(st, isNext, false);
+            nodes.push(node);
+            row.appendChild(node);
+        });
+
+        setTransferBadgeColors();
+        createTransferRings();
+
+        const themeColor = getComputedStyle(document.getElementById('local-line')).getPropertyValue('--theme-color') || '#9b5de5';
+        renderConnectorsAndArrows(nodes, themeColor);
+
+        const firstNodeIdx = leftIdxs.length ? leftIdxs[0] : rightIdxs[0];
+        const showLeftFade = firstNodeIdx > 0;
+        const lastRightIdx = rightIdxs.length ? rightIdxs[rightIdxs.length - 1] : null;
+        const lastRightIsTerminal = !!(lastRightIdx != null && ordered[lastRightIdx]?.station_name === loopTerminalStation);
+        const showRightFade = (rightIdxs.length === maxRightCapacity) && !lastRightIsTerminal && (lastRightIdx != null && lastRightIdx < n - 1);
+        renderEndFades(nodes, showLeftFade, showRightFade);
+        return;
+    }
 
     // 找到下一站索引
     const n = lineInfo.length;
@@ -512,10 +899,17 @@ function layoutLocalRow() {
     // 两端虚化省略：按方向与已渲染索引判断是否需要
     let showLeftFade = false;
     let showRightFade = false;
-    if (direction === 0 || direction === '0') {
-        showLeftFade = leftIdxs.length > 0 && Math.min(...leftIdxs) > 0;
+    
+    if (isLoop && !loopHasTerminal) {
+        // 无终点环线：始终显示左侧渐隐（因为不存在物理起点）
+        showLeftFade = true;
     } else {
-        showLeftFade = leftIdxs.length > 0 && Math.max(...leftIdxs) < n - 1;
+        // 非环线或有终点环线：按边界判断
+        if (direction === 0 || direction === '0') {
+            showLeftFade = leftIdxs.length > 0 && Math.min(...leftIdxs) > 0;
+        } else {
+            showLeftFade = leftIdxs.length > 0 && Math.max(...leftIdxs) < n - 1;
+        }
     }
 
     const lastRightIdx = rightIdxs.length ? rightIdxs[rightIdxs.length - 1] : null;

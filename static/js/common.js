@@ -122,8 +122,28 @@ document.addEventListener('keydown', function(event) {
         navigateTo('/line_map');
     } else if (event.key === '3') {
         navigateTo('/line_detail');
-    } else if (event.key === 'ArrowRight') {
-        // 右方向键 -> 下一站
+    } else if (event.key === '4') {
+            navigateTo('/arrival');
+        } else if (event.key.toLowerCase() === 't') {
+            // T 键 -> 切换开门侧
+            fetch('/api/state/door/toggle', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        window.location.reload();
+                    }
+                });
+        } else if (event.key.toLowerCase() === 'f') {
+            // F 键 -> 切换到下一站（不刷新）
+            fetch('/api/state/next_no_refresh', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        console.log('Next station updated to:', data.next_station);
+                    }
+                });
+        } else if (event.key.toLowerCase() === 'd') {
+        // D 键 -> 下一站
         fetch('/api/state/next', { method: 'POST' })
             .then(response => response.json())
             .then(data => {
@@ -131,8 +151,8 @@ document.addEventListener('keydown', function(event) {
                 window.location.reload(); // 刷新页面以更新显示
             })
             .catch(err => console.error('切换下一站失败:', err));
-    } else if (event.key === 'ArrowLeft') {
-        // 左方向键 -> 上一站
+    } else if (event.key.toLowerCase() === 'a') {
+        // A 键 -> 上一站
         fetch('/api/state/prev', { method: 'POST' })
             .then(response => response.json())
             .then(data => {
@@ -149,8 +169,8 @@ document.addEventListener('keydown', function(event) {
                 window.location.reload();
             })
             .catch(err => console.error('切换方向失败:', err));
-    } else if (event.key === 'ArrowDown') {
-        // 下方向键 -> 切换下一个路由
+    } else if (event.key.toLowerCase() === 's') {
+        // S 键 -> 切换下一个路由
         fetch('/api/state/route/next', { method: 'POST' })
             .then(response => response.json())
             .then(data => {
@@ -158,8 +178,8 @@ document.addEventListener('keydown', function(event) {
                 window.location.reload();
             })
             .catch(err => console.error('切换路由失败:', err));
-    } else if (event.key === 'ArrowUp') {
-        // 上方向键 -> 切换上一个路由
+    } else if (event.key.toLowerCase() === 'w') {
+        // W 键 -> 切换上一个路由
         fetch('/api/state/route/prev', { method: 'POST' })
             .then(response => response.json())
             .then(data => {
@@ -186,14 +206,24 @@ document.addEventListener('keydown', function(event) {
             })
             .catch(err => console.error('切换线路失败:', err));
     } else if (event.key.toLowerCase() === 'i') {
-        // i 键 -> 单行模式
-        updateLayout('one_line');
+        // i 键 -> 单行模式 (仅在页面2/线路图生效)
+        if (window.location.pathname === '/line_map') {
+            updateLayout('one_line');
+        } else if (window.location.pathname === '/line_detail') {
+            updateDetailStyle('default');
+        }
     } else if (event.key.toLowerCase() === 'o') {
-        // o 键 -> 双行模式
-        updateLayout('two_line');
+        // o 键 -> 双行模式 (仅在页面2/线路图生效)
+        if (window.location.pathname === '/line_map') {
+            updateLayout('two_line');
+        } else if (window.location.pathname === '/line_detail') {
+            updateDetailStyle('column');
+        }
     } else if (event.key.toLowerCase() === 'p') {
-        // p 键 -> 自动模式
-        updateLayout('auto');
+        // p 键 -> 自动模式 (仅在页面2/线路图生效)
+        if (window.location.pathname === '/line_map') {
+            updateLayout('auto');
+        }
     }
 });
 
@@ -214,6 +244,23 @@ function updateLayout(mode) {
         }
     })
     .catch(err => console.error('请求更新布局失败:', err));
+}
+
+function updateDetailStyle(style) {
+    fetch('/api/state/detail_style', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ style: style })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            window.location.reload();
+        } else {
+            console.error('更新详情样式失败:', data.message);
+        }
+    })
+    .catch(err => console.error('请求更新详情样式失败:', err));
 }
 
 // 格式化站点索引信息

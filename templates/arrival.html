@@ -1,342 +1,432 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
-{% block title %}到站信息{% endblock %}
+{% block title %}到站信息 - {{ config.app_name }}{% endblock %}
+
+{% block header_subtitle %}
+    {% if next_station_info and next_station_info.terminal_station %}
+        终点站：<strong>{{ next_station_info.terminal_station }}</strong>
+        <div class="line-sub-info-en">Terminal: <strong>{{ trans_data.get(next_station_info.terminal_station, next_station_info.terminal_station).replace('<br>', ' ') }}</strong></div>
+    {% else %}
+        终点站：<strong>{{ terminal_station or '未知' }}</strong>
+        <div class="line-sub-info-en">Terminal: <strong>{{ trans_data.get(terminal_station, terminal_station or 'Unknown').replace('<br>', ' ') }}</strong></div>
+    {% endif %}
+{% endblock %}
+
+{% block header_right %}
+    <span class="time" id="current-time">00:00</span>
+    <script>
+        (function() {
+            const now = new Date();
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            document.getElementById('current-time').textContent = hours + ':' + minutes;
+        })();
+    </script>
+{% endblock %}
 
 {% block page_title %}
     <div class="arrival-title">
-        <span class="arrival-label">到达站</span>
-        <span class="arrival-station-name">{% if next_station_info %}{{ next_station_info.station_name }}{% else %}{{ next_station }}{% endif %}</span>
-        <span class="arrival-station-name-en">{% if next_station_info %}{{ next_station_info.station_name_en }}{% else %}{{ next_station }}{% endif %}</span>
+        <div class="arrival-topline">
+            <span class="arrival-label">到达站</span>
+            <span class="arrival-label" style="font-size: 12px;">Arrival Station</span>
+            {% if transfer_badges and transfer_badges|length > 0 %}
+            <div class="arrival-transfers">
+                <span class="transfer-label">换乘</span>
+                <span class="transfer-label" style="font-size: 13px;">Transfer</span>
+                <span class="arrival-transfer-badges">
+                    {% for b in transfer_badges %}
+                    <span class="transfer-badge {% if b.code|string|length > 1 %}wide{% endif %}" data-color="{{ b.color }}">{{ b.code }}</span>
+                    {% endfor %}
+                </span>
+            </div>
+            {% endif %}
+        </div>
+        <span class="arrival-station-name">{{ next_station }}</span>
+        <span class="arrival-station-name-en">{{ trans_data.get(next_station, next_station).replace('<br>', ' ') }}</span>
     </div>
 {% endblock %}
 
 {% block head %}
 <style>
-    :root { --theme-color: #9b5de5; }
     .arrival-title {
         display: flex;
         flex-direction: column;
         align-items: center;
         gap: 5px;
     }
-    
+    .arrival-topline { display: inline-flex; align-items: center; gap: 10px; }
     .arrival-label {
         font-size: 18px;
         color: #fff;
         opacity: 0.9;
     }
-    
+    .transfer-label { font-size: 18px; color: #fff; opacity: 0.9; font-weight: normal; }
     .arrival-station-name {
         font-size: 32px;
         font-weight: bold;
         color: #fff;
     }
-    
     .arrival-station-name-en {
         font-size: 16px;
         color: #fff;
         opacity: 0.8;
     }
-    
-    .station-layout-container {
-        background-color: #fff;
-        border-radius: 10px;
-        padding: 30px;
-        margin: 20px 0;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    
-    .station-layout {
-        display: flex;
-        flex-direction: column;
+    .arrival-transfers {
+        display: inline-flex;
         align-items: center;
-        position: relative;
-        min-height: 300px;
+        gap: 8px;
+        color: #fff;
+        opacity: 0.9;
     }
-    
-    .platform {
+    .arrival-transfer-badges { display: inline-flex; gap: 6px; }
+    .transfer-badge { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: bold; }
+    .transfer-badge.wide { width: auto; min-width: 22px; padding: 0 5px; border-radius: 11px; }
+
+    /* 列车模型容器 */
+    .train-container {
         width: 100%;
-        height: 100px;
-        background-color: #f0f0f0;
-        border: 2px solid #999;
-        border-radius: 5px;
+        height: 350px; /* 默认大尺寸高度 */
         position: relative;
-        margin-bottom: 50px;
+        overflow: hidden;
         display: flex;
         align-items: center;
         justify-content: center;
-    }
-    
-    .platform::before {
-        content: '站台平台';
-        position: absolute;
-        top: -25px;
-        font-size: 16px;
-        font-weight: bold;
-        color: #666;
-    }
-    
-    .train {
-        width: 90%;
-        height: 150px;
-        background-color: #e0e0e0;
-        border: 3px solid #333;
-        border-radius: 8px;
-        position: relative;
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .train-roof {
-        width: 100%;
-        height: 20px;
-        background-color: var(--theme-color);
-        border-top-left-radius: 5px;
-        border-top-right-radius: 5px;
-    }
-    
-    .train-body {
-        flex: 1;
-        display: flex;
-        position: relative;
-    }
-    
-    .carriage {
-        flex: 1;
-        border-right: 1px dashed #999;
-        position: relative;
-    }
-    
-    .carriage:last-child {
-        border-right: none;
-    }
-    
-    .carriage-number {
-        position: absolute;
-        top: 5px;
-        left: 5px;
-        font-size: 14px;
-        font-weight: bold;
-        color: #666;
-    }
-    
-    .door {
-        position: absolute;
-        width: 60px;
-        height: 80%;
-        top: 10%;
-        left: 50%;
-        transform: translateX(-50%);
-        background-color: #ff4757;
-        border: 2px solid #d63031;
-        border-radius: 4px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: white;
-        font-weight: bold;
-        font-size: 18px;
-        animation: pulse 1.5s infinite;
-    }
-    
-    @keyframes pulse {
-        0% { opacity: 1; }
-        50% { opacity: 0.7; }
-        100% { opacity: 1; }
-    }
-    
-    .current-carriage {
-        background-color: #ffd700;
-    }
-    
-    .current-carriage-indicator {
-        position: absolute;
-        bottom: -30px;
-        left: 50%;
-        transform: translateX(-50%);
-        background-color: #ff4757;
-        color: white;
-        padding: 5px 15px;
-        border-radius: 20px;
-        font-size: 14px;
-        font-weight: bold;
-    }
-    
-    .exit-signs {
-        position: absolute;
-        top: -20px;
-        display: flex;
-        gap: 10px;
-    }
-    
-    .exit-sign {
-        background-color: #2d3436;
-        color: white;
-        padding: 5px 10px;
-        border-radius: 4px;
-        font-size: 12px;
-        font-weight: bold;
-    }
-    
-    .exit-sign.A {
-        background-color: #00b894;
-    }
-    
-    .exit-sign.B {
-        background-color: #0984e3;
-    }
-    
-    .exit-sign.C {
-        background-color: #fdcb6e;
-        color: #2d3436;
-    }
-    
-    .exit-sign.D {
-        background-color: #d63031;
-    }
-    
-    .direction-arrows {
-        position: absolute;
-        bottom: -40px;
-        right: 20px;
-        font-size: 24px;
-        color: var(--theme-color);
-    }
-    
-    .announcement {
-        background-color: #f8f9fa;
-        border-left: 4px solid var(--theme-color);
-        padding: 15px;
-        margin: 20px 0;
-        font-size: 16px;
-        color: #666;
-        border-radius: 0 5px 5px 0;
-    }
-    
-    .announcement strong {
-        color: var(--theme-color);
-    }
-    
-    .next-station-info {
-        background-color: var(--theme-color);
-        color: white;
-        padding: 15px;
-        border-radius: 8px;
+        background-color: transparent;
         margin-top: 20px;
-        font-size: 16px;
+    }
+    .train-container.is-mini {
+        height: 240px; /* 缩小样式高度 */
+        margin-top: 5px;
+    }
+
+    .train-wrapper {
+        position: absolute;
+        display: flex;
+        align-items: flex-end;
+        transition: transform 1.5s ease-out;
+        transform: translateX({% if direction|int == 0 %}-100%{% else %}100%{% endif %});
+        transform-origin: center bottom;
+    }
+
+    /* 侧边文字样式 */
+    .train-side-info {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        display: flex;
+        flex-direction: column;
+        width: 320px;
+        pointer-events: none;
+        opacity: 0;
+        transition: opacity 0.5s ease-in 1s;
+        align-items: center;
+        text-align: center;
+        z-index: 20;
+    }
+    .train-side-info.left { left: 2%; } 
+    .train-side-info.right { right: 2%; } 
+    .train-container.is-mini .train-side-info.left { left: 1%; } 
+    .train-container.is-mini .train-side-info.right { right: 1%; } 
+    .train-side-info.visible { opacity: 1; }
+
+    /* 轨道横线样式 */
+    .train-track {
+        position: absolute;
+        bottom: 143px; /* 默认高度 */
+        width: 55%;
+        height: 4px;
+        background-color: #333;
+        left: 50%;
+        transform: translateX(-50%);
+        border-radius: 2px;
+    }
+    .train-container.is-mini .train-track {
+        bottom: 96px; /* 缩小高度 */
+        width: 60%;
+        height: 3px;
+    }
+
+    .side-label-zh { font-size: 24px; font-weight: bold; color: #333; margin-bottom: 4px; white-space: nowrap; }
+    .train-container.is-mini .side-label-zh { font-size: 20px; }
+    
+    .side-label-en { font-size: 16px; color: #666; line-height: 1.2; }
+    .train-container.is-mini .side-label-en { font-size: 14px; }
+    
+    .side-station-name { font-size: 36px; font-weight: bold; color: var(--theme-color); margin-top: 8px; white-space: nowrap; }
+    .train-container.is-mini .side-station-name { font-size: 32px; }
+    
+    /* 换乘样式 */
+    .side-transfers {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 15px;
+        color: #555;
+    }
+    .train-container.is-mini .side-transfers { margin-top: 10px; }
+    
+    .side-transfer-label-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+    }
+    .side-transfer-label { font-size: 22px; font-weight: bold; }
+    .train-container.is-mini .side-transfer-label { font-size: 20px; }
+    
+    .side-transfer-label-en { font-size: 14px; font-weight: normal; opacity: 0.8; }
+    .train-container.is-mini .side-transfer-label-en { font-size: 12px; }
+    
+    .side-transfer-badges { display: flex; gap: 8px; }
+    .side-transfer-badge {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 14px;
+        font-weight: bold;
+    }
+    .train-container.is-mini .side-transfer-badge { width: 24px; height: 24px; font-size: 12px; }
+    
+    .side-transfer-badge.wide {
+        width: auto;
+        min-width: 28px;
+        padding: 0 8px;
+        border-radius: 14px;
+    }
+    .train-container.is-mini .side-transfer-badge.wide { min-width: 24px; padding: 0 6px; border-radius: 12px; }
+
+    /* 列车车厢通用样式 */
+    .carriage {
+        width: 120px;
+        height: 60px;
+        border: 2px solid #333;
+        background-color: #fff;
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 24px;
+        color: #9b5de5;
+        flex-shrink: 0;
+    }
+    .train-container.is-mini .carriage {
+        width: 100px;
+        height: 48px;
+        font-size: 20px;
+    }
+
+    /* 车头/车尾形状 */
+    .carriage-head-left {
+        border-top-left-radius: 30px;
+        border-bottom-left-radius: 10px;
+        border-left-width: 3px;
+    }
+    .train-container.is-mini .carriage-head-left {
+        border-top-left-radius: 24px;
+        border-bottom-left-radius: 8px;
+    }
+    
+    .carriage-head-right {
+        border-top-right-radius: 30px;
+        border-bottom-right-radius: 10px;
+        border-right-width: 3px;
+    }
+    .train-container.is-mini .carriage-head-right {
+        border-top-right-radius: 24px;
+        border-bottom-right-radius: 8px;
+    }
+
+    /* 当前车厢闪烁效果 */
+    .current-carriage-overlay {
+        position: absolute;
+        top: -80px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 140px;
+        height: 70px;
+        background-color: rgba(255, 59, 48, 0.7);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 14px;
+        border-radius: 5px;
+        animation: blink 0.5s infinite alternate;
+        z-index: 10;
+        text-align: center;
+        pointer-events: none;
+    }
+    .train-container.is-mini .current-carriage-overlay {
+        top: -70px;
+        width: 120px;
+        height: 60px;
+        font-size: 12px;
+    }
+
+    .current-carriage-overlay::after {
+        content: '';
+        position: absolute;
+        bottom: -10px;
+        left: 50%;
+        transform: translateX(-50%);
+        border-left: 10px solid transparent;
+        border-right: 10px solid transparent;
+        border-top: 10px solid rgba(255, 59, 48, 0.7);
+    }
+
+    .current-carriage-highlight {
+        position: absolute;
+        inset: -2px;
+        background-color: rgba(255, 59, 48, 0.4);
+        border: 2px solid #ff3b30;
+        z-index: 5;
+        animation: blink 0.5s infinite alternate;
+    }
+
+    @keyframes blink {
+        from { opacity: 0.3; }
+        to { opacity: 1; }
     }
 </style>
 {% endblock %}
 
 {% block content %}
-    <div class="station-layout-container" style="--theme-color: {{ line_color or '#9b5de5' }};">
-        <div class="station-layout">
-            <!-- 站台平台 -->
-            <div class="platform">
-                <div class="exit-signs">
-                    <div class="exit-sign A">A出口</div>
-                    <div class="exit-sign B">B出口</div>
-                    <div class="exit-sign C">C出口</div>
-                    <div class="exit-sign D">D出口</div>
-                </div>
-            </div>
-            
-            <!-- 列车 -->
-            <div class="train">
-                <div class="train-roof"></div>
-                <div class="train-body">
-                    <!-- 车厢1 -->
-                    <div class="carriage">
-                        <div class="carriage-number">8</div>
-                    </div>
-                    
-                    <!-- 车厢2 -->
-                    <div class="carriage">
-                        <div class="carriage-number">7</div>
-                    </div>
-                    
-                    <!-- 车厢3 -->
-                    <div class="carriage">
-                        <div class="carriage-number">6</div>
-                    </div>
-                    
-                    <!-- 车厢4 -->
-                    <div class="carriage">
-                        <div class="carriage-number">5</div>
-                    </div>
-                    
-                    <!-- 车厢5 -->
-                    <div class="carriage">
-                        <div class="carriage-number">4</div>
-                    </div>
-                    
-                    <!-- 车厢6（当前车厢） -->
-                    <div class="carriage current-carriage">
-                        <div class="carriage-number">3</div>
-                        <div class="door">
-                            开门
-                        </div>
-                        <div class="current-carriage-indicator">当前车厢</div>
-                    </div>
-                    
-                    <!-- 车厢7 -->
-                    <div class="carriage">
-                        <div class="carriage-number">2</div>
-                    </div>
-                    
-                    <!-- 车厢8 -->
-                    <div class="carriage">
-                        <div class="carriage-number">1</div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="direction-arrows">→→→</div>
-        </div>
-        
-        <!-- 到站提示 -->
-        <div class="announcement">
-            <strong>{% if next_station_info %}{{ next_station_info.station_name }}{% else %}{{ next_station }}{% endif %}站</strong>到了，请从列车前进方向右侧车门下车，注意列车与站台之间的空隙。
-        </div>
-        
-        <!-- 下一站信息 -->
-        <div class="next-station-info">
-            <strong>下一站：</strong>{% if next_station %}{{ next_station }}{% endif %}，
-            {% if transfer_badges and transfer_badges|length > 0 %}
-                本站可换乘：
-                <span class="transfer-badges" style="display:inline-flex; gap:8px; vertical-align:middle;">
-                    {% for b in transfer_badges %}
-                    <span class="transfer-badge" style="display:inline-flex; align-items:center; justify-content:center; height:24px; font-weight:bold; color:#fff; {% if b.code|string|length > 1 %}width:auto; min-width:24px; padding:0 5px; border-radius:12px;{% else %}width:24px; border-radius:50%;{% endif %}" data-color="{{ b.color }}">{{ b.code }}</span>
-                    {% endfor %}
-                </span>
-            {% else %}
-                本站无换乘线路。
-            {% endif %}
-        </div>
+<div class="train-container {% if (carriage_count|default(6))|int > 6 %}is-mini{% endif %}">
+    <div class="train-track"></div>
+    <div class="train-side-info left" id="info-left"></div>
+    <div class="train-side-info right" id="info-right"></div>
+    <div class="train-wrapper" id="train-wrapper">
+        <!-- 车厢将由JS生成 -->
     </div>
-    
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // 到站信息页面加载完成
-        console.log('到站信息页面加载完成');
-        
-        // 添加开门动画效果
-        const door = document.querySelector('.door');
-        if (door) {
-            setInterval(() => {
-                door.style.opacity = door.style.opacity === '0.6' ? '1' : '0.6';
-            }, 500);
+        const wrapper = document.getElementById('train-wrapper');
+        const direction = {{ direction|int }};
+        const carriageCount = {{ carriage_count|default(6) }};
+        const currentCarriageNum = 3; // 假设当前车厢为3号
+        const themeColor = '{{ line_color or "#9b5de5" }}';
+        const doorSide = '{{ door_side }}';
+        const nextStation = '{{ next_station }}';
+        const nextStationEn = '{{ trans_data.get(next_station, next_station).replace("<br>", " ") }}';
+        const terminalStation = '{{ terminal_station }}';
+        const isTerminal = (nextStation === terminalStation);
+        const transferBadges = {{ transfer_badges|tojson|safe }};
+
+        // 隐藏Header中的开门侧信息，仅显示时间
+        const doorWrapper = document.getElementById('header-door-info-wrapper');
+        const timeWrapper = document.getElementById('header-time-only-wrapper');
+        if (doorWrapper) doorWrapper.style.display = 'none';
+        if (timeWrapper) timeWrapper.style.display = 'flex';
+
+        // 生成车厢
+        for (let i = 1; i <= carriageCount; i++) {
+            const carriage = document.createElement('div');
+            carriage.className = 'carriage';
+            
+            // 编号逻辑：方向0右侧为1，方向1左侧为1
+            let displayNum;
+            if (direction === 0) {
+                displayNum = carriageCount - i + 1;
+            } else {
+                displayNum = i;
+            }
+            
+            carriage.textContent = displayNum;
+            carriage.style.color = themeColor;
+
+            // 车头车尾形状
+            if (i === 1) {
+                carriage.classList.add('carriage-head-left');
+                // 方向0：左侧是车尾；方向1：左侧是车头
+                setupSideInfo('left', direction === 1 ? 'head' : 'tail');
+            } else if (i === carriageCount) {
+                carriage.classList.add('carriage-head-right');
+                // 方向0：右侧是车头；方向1：右侧是车尾
+                setupSideInfo('right', direction === 0 ? 'head' : 'tail');
+            }
+
+            // 当前车厢标记
+            if (displayNum === currentCarriageNum) {
+                const highlight = document.createElement('div');
+                highlight.className = 'current-carriage-highlight';
+                carriage.appendChild(highlight);
+
+                const overlay = document.createElement('div');
+                overlay.className = 'current-carriage-overlay';
+                overlay.innerHTML = '当前车厢<br>Current Carriage';
+                carriage.appendChild(overlay);
+            }
+
+            wrapper.appendChild(carriage);
         }
 
-        // 通过 data-color 设置换乘徽章背景色，避免CSS模板表达式
-        document.querySelectorAll('.transfer-badge[data-color]').forEach(el => {
-            const color = el.getAttribute('data-color');
-            if (color) {
-                el.style.backgroundColor = color;
+        function setupSideInfo(position, type) {
+            const infoEl = document.getElementById(`info-${position}`);
+            if (!infoEl) return;
+            
+            if (type === 'head') {
+                const labelZh = isTerminal ? '到达终点站' : '到达站';
+                const labelEn = isTerminal ? 'Arrive at Terminal' : 'Arrive at';
+                
+                let transferHtml = '';
+                if (transferBadges && transferBadges.length > 0) {
+                    transferHtml = `
+                        <div class="side-transfers">
+                            <div class="side-transfer-label-wrapper">
+                                <span class="side-transfer-label">换乘</span>
+                                <span class="side-transfer-label-en">Transfer</span>
+                            </div>
+                            <div class="side-transfer-badges">
+                                ${transferBadges.map(b => `
+                                    <span class="side-transfer-badge ${b.code.length > 1 ? 'wide' : ''}" 
+                                          style="background-color: ${b.color}">
+                                        ${b.code}
+                                    </span>
+                                `).join('')}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                infoEl.innerHTML = `
+                    <div class="side-label-zh" style="font-size: 24px; white-space: nowrap;">${labelZh}</div>
+                    <div class="side-label-en" style="font-size: 14px;">${labelEn}</div>
+                    <div class="side-station-name" style="font-size: 36px; margin-top: 10px; white-space: nowrap;">${nextStation}</div>
+                    <div class="side-label-en" style="font-size: 14px; margin-top: 5px;">${nextStationEn}</div>
+                    ${transferHtml}
+                `;
+            } else {
+                const sideText = doorSide === '本侧' ? '本侧开门' : '对侧开门';
+                const sideTextEn = doorSide === '本侧' ? 'Doors open on this side' : 'Doors open on opposite side';
+                infoEl.innerHTML = `
+                    <div class="side-label-zh">${sideText}</div>
+                    <div class="side-label-en" style="margin-top: 5px;">${sideTextEn}</div>
+                `;
             }
+        }
+
+        // 入场动画
+        setTimeout(() => {
+            wrapper.style.transform = 'translateX(0)';
+            // 动画结束后显示文字
+            document.getElementById('info-left').classList.add('visible');
+            document.getElementById('info-right').classList.add('visible');
+        }, 100);
+
+        // 设置换乘徽章颜色
+        document.querySelectorAll('.transfer-badge[data-color]').forEach(el => {
+            el.style.backgroundColor = el.getAttribute('data-color');
         });
     });
 </script>

@@ -2,10 +2,26 @@
 
 {% block title %}运营线路{% endblock %}
 
+{% block header_subtitle %}
+{% endblock %}
+
 {% block page_title %}
     <div class="next-station-title">
-        <span class="next-station-label">下一站</span>
-        <span class="next-station-label" style="font-size: 12px;">Next Station</span>
+        <div class="next-topline">
+            <span class="next-station-label">下一站</span>
+            <span class="next-station-label" style="font-size: 12px;">Next Station</span>
+            {% if transfer_badges and transfer_badges|length > 0 %}
+            <div class="next-station-transfers">
+                <span class="transfer-label">换乘</span>
+                <span class="transfer-label" style="font-size: 13px;">Transfer</span>
+                <span class="next-transfer-badges">
+                    {% for b in transfer_badges %}
+                    <span class="transfer-badge {% if b.code|string|length > 1 %}wide{% endif %}" data-color="{{ b.color }}">{{ b.code }}</span>
+                    {% endfor %}
+                </span>
+            </div>
+            {% endif %}
+        </div>
         <span class="next-station-name">{{ next_station }}</span>
         <span class="next-station-name-en">{{ trans_data.get(next_station, next_station).replace('<br>', ' ') }}</span>
     </div>
@@ -19,25 +35,34 @@
         align-items: center;
         gap: 5px;
     }
-    
+    .next-topline { display: inline-flex; align-items: center; gap: 10px; }
     .next-station-label {
         font-size: 18px;
         color: #fff;
         opacity: 0.9;
     }
-    
+    .transfer-label { font-size: 18px; color: #fff; opacity: 0.9; font-weight: normal; }
     .next-station-name {
         font-size: 32px;
         font-weight: bold;
         color: #fff;
     }
-    
     .next-station-name-en {
         font-size: 16px;
         color: #fff;
         opacity: 0.8;
     }
-    
+    .next-station-transfers {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: #fff;
+        opacity: 0.9;
+    }
+    .next-transfer-badges { display: inline-flex; gap: 6px; }
+    .transfer-badge { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; font-weight: bold; }
+    .transfer-badge.wide { width: auto; min-width: 22px; padding: 0 5px; border-radius: 11px; }
+
     .route-info {
         margin: 30px 0;
     }
@@ -48,6 +73,7 @@
         justify-content: space-between;
         margin: 20px 0;
         position: relative;
+        gap: 60px; /* 增加最小间距，防止长站名挤压 */
     }
     
     :root { --dot-adjust: 2.5px; --rail-adjust: -2px; --rail-thickness: 10px; }
@@ -83,11 +109,21 @@
         border: 2px solid var(--theme-color);
         border-radius: 20px;
         z-index: 2;
+        max-width: 280px; /* 限制最大宽度，防止长站名占满屏幕 */
+        flex-shrink: 0;   /* 确保气泡不会被挤压变形 */
+    }
+    .terminal-station .term-cn { font-size: 16px; font-weight: bold; color: inherit; white-space: nowrap; }
+    /* 英文站名过长时允许换行，避免撑开气泡 */
+    .terminal-station .term-en { 
+        font-size: 12px; 
+        color: #666; 
+        white-space: normal; 
+        text-align: center;
+        word-break: break-word;
+        max-width: 100%;
     }
     /* 无终点的环线：中英文同一行显示，避免自动换行 */
     .route-line.single .terminal-station { flex-direction: row; gap: 8px; }
-    .terminal-station .term-cn { font-size: 16px; font-weight: bold; color: inherit; white-space: nowrap; }
-    .terminal-station .term-en { font-size: 12px; color: #666; white-space: nowrap; }
     .route-line.active .terminal-station { background-color: var(--theme-color); color: white; }
     .route-line.active .terminal-station .term-en { color: #fff; opacity: 0.9; }
     
@@ -404,7 +440,17 @@
                         }
                     }
 
-                    const railWidth = Math.max(0, Math.floor(lineRect.width - leftInset - rightInset));
+                    let railWidth = Math.max(0, Math.floor(lineRect.width - leftInset - rightInset));
+                    
+                    // 确保轨道（站点点位区域）有最小宽度，避免长站名挤压导致点位重叠
+                    const minRailWidth = 120; 
+                    if (railWidth < minRailWidth && lineRect.width > minRailWidth) {
+                        const diff = minRailWidth - railWidth;
+                        leftInset = Math.max(10, leftInset - diff / 2);
+                        rightInset = Math.max(10, rightInset - diff / 2);
+                        railWidth = Math.max(0, Math.floor(lineRect.width - leftInset - rightInset));
+                    }
+
                     line.style.setProperty('--rail-left', leftInset + 'px');
                     line.style.setProperty('--rail-width', railWidth + 'px');
 
@@ -423,6 +469,12 @@
                         if (effectiveTotals[index] < maxTotal * 0.5) {
                             visibleCount = Math.max(2, Math.floor(originalCount * lengthRatio * 0.8));
                         }
+                        
+                        // 确保点之间有最小间距，防止重叠
+                        const minDotGap = 24; 
+                        const maxDotsBySpace = Math.floor(railWidth / minDotGap);
+                        visibleCount = Math.max(2, Math.min(visibleCount, maxDotsBySpace));
+
                         wrap.classList.add('grid');
                         wrap.style.setProperty('--col-count', visibleCount);
                         indicators.forEach((el, idx) => {

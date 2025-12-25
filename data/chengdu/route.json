@@ -3,6 +3,8 @@
     "line_name": "1号线-Line 1",
     "type": "linear",
     "layout": "one_line",
+    "detail_style": "default",
+    "carriage_count": 6,
     "station_spacing_multiplier": 1,
     "services": [
       {
@@ -25,19 +27,22 @@
   "line_2": {
     "line_name": "2号线-Line 2",
     "type": "linear",
-    "layout": "auto",
+    "layout": "two_line",
+    "carriage_count": 6,
     "station_spacing_multiplier": 1,
     "services": [
       {
         "type": "route1",
         "stations": ["犀浦", "天河路", "百草路", "金周路", "金科北路", "迎宾大道", "茶店子客运站", "羊犀立交", "一品天下", "蜀汉路东", "白果林", "中医大·省医院", "通惠门", "人民公园", "天府广场", "春熙路", "东门大桥", "牛王庙", "牛市口", "东大路", "塔子山公园", "成都东客站", "成渝立交", "惠王陵", "洪河", "成都行政学院"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_3": {
     "line_name": "3号线-Line 3",
     "type": "linear",
     "layout": "two_line",
+    "carriage_count": 6,
     "station_spacing_multiplier": 1,
     "services": [
       {
@@ -53,12 +58,14 @@
         "group": "1",
         "stations": ["熊猫大道", "动物园", "昭觉寺南路", "驷马桥", "李家沱", "前锋路", "红星桥", "市二医院", "春熙路", "新南门", "磨子桥", "省体育馆", "衣冠庙", "高升桥", "红牌楼", "太平园", "川藏立交", "武侯立交", "武青南路", "双凤桥", "龙桥路", "航都大街", "迎春桥", "东升", "双流广场", "三里坝", "双流西站"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_4": {
     "line_name": "4号线-Line 4",
     "type": "linear",
     "layout": "two_line",
+    "carriage_count": 6,
     "station_spacing_multiplier": 1,
     "services": [
       {
@@ -69,12 +76,14 @@
         "type": "route2",
         "stations": ["光华公园", "涌泉", "凤凰大街", "马厂坝", "非遗博览园", "蔡桥", "中坝", "成都西站", "清江西路", "文化宫", "西南财大", "草堂北路", "中医大·省医院", "宽窄巷子", "骡马市", "太升南路", "市二医院", "玉双路", "双桥路", "万年场", "槐树店", "来龙"]
       }
-    ]
+    ],
+    "detail_style": "column"
   },
   "line_5": {
     "line_name": "5号线-Line 5",
     "type": "linear",
     "layout": "two_line",
+    "carriage_count": 8,
     "station_spacing_multiplier": 1,
     "services": [
       {
@@ -90,12 +99,14 @@
         "group": "1",
         "stations": ["柏水场", "廖家湾", "北部商贸城", "幸福桥", "九道堰", "杜家碾", "大丰", "石犀公园", "皇花园", "陆家桥", "泉水路", "洞子口", "福宁路", "五块石", "赛云台", "北站西二路", "西北桥", "花牌坊", "抚琴", "中医大·省医院", "青羊宫", "省骨科医院", "高升桥", "科园", "九兴大道", "神仙树", "石羊立交", "市一医院", "交子大道", "锦城大道", "锦城湖", "大源", "民乐", "骑龙", "警官学院", "二江寺", "南湖立交", "怡心湖", "龙马路", "回龙"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_6": {
     "line_name": "6号线-Line 6",
     "type": "linear",
     "layout": "two_line",
+    "carriage_count": 8,
     "station_spacing_multiplier": 1,
     "services": [
       {
@@ -111,12 +122,14 @@
         "group": "1",
         "stations": ["望丛祠", "和平街", "郫筒", "蜀新大道", "檬梓", "尚锦路", "红高路", "天宇路", "犀浦", "兴业北街", "梓潼宫", "侯家桥", "兴盛", "青杠", "西华大道", "金府", "星河", "西南交大", "沙湾", "西北桥", "人民北路", "梁家巷", "前锋路", "建设北路", "新鸿路", "玉双路", "牛王庙", "顺江路", "三官堂", "东光", "琉璃场", "琉三路", "金石路", "金融城东", "中和", "张家寺"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_7": {
     "line_name": "7号线-Line 7",
-    "layout": "two_line",
+    "layout": "auto",
     "type": "loop",
+    "carriage_count": 6,
     "station_spacing_multiplier": 1,
     "services": [
       {
@@ -130,12 +143,14 @@
         "terminal_station": "崔家店",
         "stations": ["火车北站", "北站西二路", "九里堤", "西南交大", "花照壁", "茶店子", "一品天下", "金沙博物馆", "文化宫", "东坡路", "龙爪堰", "武侯大道", "太平园", "高朋大道", "神仙树", "火车南站", "三瓦窑", "琉璃场", "四川师大", "狮子山", "大观", "成都东客站", "迎晖路", "槐树店", "双店路", "崔家店", "理工大学", "二仙桥", "八里庄", "府青路", "驷马桥"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_8": {
     "line_name": "8号线-Line 8",
     "layout": "one_line",
     "type": "linear",
+    "carriage_count": 6,
     "station_spacing_multiplier": 1,
     "services": [
       {
@@ -147,12 +162,14 @@
         "group": "1",
         "stations": ["桂龙路", "桂林", "同乐", "龙潭寺", "龙潭立交", "圣灯公园", "十里店", "理工大学", "东郊记忆", "杉板桥", "万年路", "双桥路", "东大路", "净居寺", "东光", "东湖公园", "川大望江校区", "倪家桥", "芳草街", "永丰", "九兴大道", "高朋大道", "殷家林", "庆安", "石羊", "三元", "顺风", "珠江路", "川大江安校区", "文星"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_9": {
     "line_name": "9号线-Line 9",
     "type": "linear",
     "layout": "one_line",
+    "carriage_count": 8,
     "station_spacing_multiplier": 1,
     "services": [
       {
@@ -164,12 +181,14 @@
         "group": "1",
         "stations": ["机投桥", "武青南路", "簇桥", "华兴", "太平寺", "三元", "锦城大道", "孵化园", "心岛", "金融城东"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_10": {
     "line_name": "10号线-Line 10",
     "type": "linear",
     "layout": "one_line",
+    "carriage_count": 6,
     "station_spacing_multiplier": 1,
     "services": [
       {
@@ -180,24 +199,28 @@
         "service_name": "route2",
         "stations": ["武侯祠", "高升桥", "红牌楼", "太平园", "簇锦", "华兴", "金花", "双流机场1航站楼", "双流机场2航站楼", "双流西站", "应天寺", "黄水", "花源", "新津", "花桥"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_13": {
     "line_name": "13号线-Line 13",
     "type": "linear",
     "layout": "one_line",
+    "carriage_count": 8,
     "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
         "stations": ["瓦窑滩", "万家湾", "培风", "万寿桥", "东坡路", "光华村", "杜甫草堂", "青羊宫", "小南街", "文翁石室", "华西坝", "新南门", "九眼桥", "三官堂", "净居寺", "四川师大", "娇子立交", "幸福梅林", "三圣花乡", "龙华寺", "龙安"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_17": {
     "line_name": "17号线-Line 17",
     "type": "linear",
     "layout": "one_line",
+    "carriage_count": 8,
     "station_spacing_multiplier": 1,
     "services": [
       {
@@ -208,12 +231,14 @@
         "service_name": "route2",
         "stations": ["九江北", "白佛桥", "机投桥", "阳公桥", "龙爪堰", "清水河大桥", "浣花里", "省骨科医院", "小南街", "人民公园", "西大街", "城隍庙", "红星桥", "建设北路", "踏水桥", "二仙桥", "机车厂"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_18": {
     "line_name": "18号线-Line 18",
     "type": "linear",
     "layout": "one_line",
+    "carriage_count": 8,
     "station_spacing_multiplier": 1,
     "services": [
       {
@@ -228,12 +253,14 @@
         "service_name": "route3",
         "stations": ["火车南站", "天府机场1号2号航站楼", "天府机场北"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_19": {
     "line_name": "19号线-Line 19",
     "type": "linear",
     "layout": "one_line",
+    "carriage_count": 4,
     "station_spacing_multiplier": 1,
     "services": [
       {
@@ -248,12 +275,14 @@
         "service_name": "route3",
         "stations": ["双流机场2航站楼东", "天府机场1号2号航站楼"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_27": {
     "line_name": "27号线-Line 27",
     "type": "linear",
     "layout": "one_line",
+    "carriage_count": 6,
     "station_spacing_multiplier": 1,
     "services": [
       {
@@ -264,30 +293,35 @@
         "service_name": "route2",
         "stations": ["三圣寺", "范家巷", "鲤鱼湾", "赖家店", "韦家碾", "双水碾", "王贾桥", "洞子口", "沙河源", "新桥", "金府", "花照壁北", "金牛公园", "羊犀立交", "黄忠", "金沙滨河公园", "蜀鑫路"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_30": {
     "line_name": "30号线-Line 30",
     "type": "linear",
     "layout": "one_line",
+    "carriage_count": 6,
     "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
         "stations": ["龙泉驿火车站南", "玉虹路", "分水", "玉石", "惠王陵", "航天立交", "海桐街", "娇子立交", "锦逸", "棬子树", "金石路", "府城桥", "金融城北", "益州大道", "市一医院", "新园大道", "石羊东", "大同", "珠江路", "谢家渡", "光明", "星月", "寺圣", "双流机场2航站楼东"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_S3": {
     "line_name": "S3线(资阳线)-Line S3",
     "type": "linear",
     "layout": "one_line",
+    "carriage_count": 4,
     "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
         "stations": ["福田", "资阳临空", "幸福大道", "苌弘广场", "宝台", "资阳北站"]
       }
-    ]
+    ],
+    "detail_style": "default"
   }
 }

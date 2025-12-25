@@ -216,7 +216,26 @@ def prev_station():
 def reverse_direction():
     """切换运行方向 (R键)"""
     global current_state
-    current_state['direction'] = 1 if current_state.get('direction', 0) == 0 else 0
+    direction = 1 if current_state.get('direction', 0) == 0 else 0
+    current_state['direction'] = direction
+    
+    # 切换方向后，重置到当前线路交路的第一站
+    line_name = current_state['line_name']
+    route_name = current_state['route_name']
+    
+    line_info = None
+    if tools is not None:
+        line_info = tools.get_line_map_info(line_name, route_name)
+    if line_info is None:
+        line_info = fallback_get_line_map_info(line_name, route_name)
+        
+    if line_info:
+        # 如果是反向，第一站是原始列表的最后一站
+        if direction == 1:
+            current_state['next_station'] = line_info[-1]['station_name']
+        else:
+            current_state['next_station'] = line_info[0]['station_name']
+            
     save_current_state(current_state)
     return jsonify(current_state)
 
@@ -225,6 +244,7 @@ def next_route():
     """切换到下一个路由 (下方向键)"""
     global current_state
     line_name = current_state['line_name']
+    direction = current_state.get('direction', 0)
     
     # 获取该线路下所有的 route 列表
     data_dir = get_data_dir()
@@ -245,7 +265,22 @@ def next_route():
                 curr_idx = 0
                 
             next_idx = (curr_idx + 1) % len(route_names)
-            current_state['route_name'] = route_names[next_idx]
+            new_route = route_names[next_idx]
+            current_state['route_name'] = new_route
+            
+            # 切换路由后，重置到该交路的第一站
+            line_info = None
+            if tools is not None:
+                line_info = tools.get_line_map_info(line_name, new_route)
+            if line_info is None:
+                line_info = fallback_get_line_map_info(line_name, new_route)
+                
+            if line_info:
+                if direction == 1:
+                    current_state['next_station'] = line_info[-1]['station_name']
+                else:
+                    current_state['next_station'] = line_info[0]['station_name']
+                    
             save_current_state(current_state)
             return jsonify(current_state)
     except Exception as e:
@@ -285,7 +320,14 @@ def next_line():
             if line_info is None:
                 line_info = fallback_get_line_map_info(new_line, new_route)
             
-            new_station = line_info[0]['station_name'] if line_info else ''
+            direction = current_state.get('direction', 0)
+            if line_info:
+                if direction == 1:
+                    new_station = line_info[-1]['station_name']
+                else:
+                    new_station = line_info[0]['station_name']
+            else:
+                new_station = ''
             
             current_state['line_name'] = new_line
             current_state['route_name'] = new_route
@@ -329,7 +371,14 @@ def prev_line():
             if line_info is None:
                 line_info = fallback_get_line_map_info(new_line, new_route)
             
-            new_station = line_info[0]['station_name'] if line_info else ''
+            direction = current_state.get('direction', 0)
+            if line_info:
+                if direction == 1:
+                    new_station = line_info[-1]['station_name']
+                else:
+                    new_station = line_info[0]['station_name']
+            else:
+                new_station = ''
             
             current_state['line_name'] = new_line
             current_state['route_name'] = new_route
@@ -382,11 +431,51 @@ def update_layout():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/api/state/detail_style', methods=['POST'])
+def update_detail_style():
+    global current_state
+    style = (request.json or {}).get('style')
+    if style not in ['default', 'column']:
+        return jsonify({'status': 'error', 'message': '无效的详情样式'}), 400
+
+    line_name = current_state['line_name']
+    data_dir = get_data_dir()
+    route_file = os.path.join(data_dir, 'route.json')
+
+    try:
+        with open(route_file, 'r', encoding='utf-8') as f:
+            route_data = json.load(f)
+
+        if line_name not in route_data:
+            return jsonify({'status': 'error', 'message': '未找到线路'}), 404
+
+        line_cfg = route_data.get(line_name, {})
+        if not isinstance(line_cfg, dict):
+            line_cfg = {}
+        line_cfg['detail_style'] = style
+        route_data[line_name] = line_cfg
+
+        save_json_file(route_file, route_data)
+
+        if 'route.json' in _DATA_CACHE:
+            del _DATA_CACHE['route.json']
+
+        if tools is not None:
+            try:
+                tools._load_data()
+            except Exception as e:
+                print(f"重载 RouteTools 数据失败: {e}")
+
+        return jsonify({'status': 'success', 'detail_style': style})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/api/state/route/prev', methods=['POST'])
 def prev_route():
     """切换到上一个路由 (上方向键)"""
     global current_state
     line_name = current_state['line_name']
+    direction = current_state.get('direction', 0)
     
     data_dir = get_data_dir()
     route_file = os.path.join(data_dir, 'route.json')
@@ -406,12 +495,90 @@ def prev_route():
                 curr_idx = 0
                 
             prev_idx = (curr_idx - 1 + len(route_names)) % len(route_names)
-            current_state['route_name'] = route_names[prev_idx]
+            new_route = route_names[prev_idx]
+            current_state['route_name'] = new_route
+            
+            # 切换路由后，重置到该交路的第一站
+            line_info = None
+            if tools is not None:
+                line_info = tools.get_line_map_info(line_name, new_route)
+            if line_info is None:
+                line_info = fallback_get_line_map_info(line_name, new_route)
+                
+            if line_info:
+                if direction == 1:
+                    current_state['next_station'] = line_info[-1]['station_name']
+                else:
+                    current_state['next_station'] = line_info[0]['station_name']
+                    
             save_current_state(current_state)
             return jsonify(current_state)
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+
+@app.route('/api/state/door/toggle', methods=['POST'])
+def toggle_door_side():
+    """切换开门侧 (t 键)"""
+    global current_state
+    current_side = current_state.get('door_side', '本侧')
+    new_side = '对侧' if current_side == '本侧' else '本侧'
+    current_state['door_side'] = new_side
+    save_current_state(current_state)
+    return jsonify({'status': 'success', 'door_side': new_side})
+
+@app.route('/api/state/next_no_refresh', methods=['POST'])
+def next_station_no_refresh():
+    """切换到下一站但不刷新页面 (] 键)"""
+    global current_state
+    line_name = current_state['line_name']
+    route_name = current_state['route_name']
+    
+    line_info = None
+    if tools is not None:
+        line_info = tools.get_station_info(line_name, route_name)
+    if not line_info:
+        line_info = fallback_get_station_info(line_name, route_name)
+    
+    if line_info:
+        stations = [s.get('station_name') for s in line_info]
+        direction = current_state.get('direction', 0)
+        if direction == 1:
+            stations = list(reversed(stations))
+            
+        curr_next = current_state.get('next_station')
+        try:
+            curr_idx = stations.index(curr_next)
+            if curr_idx + 1 < len(stations):
+                current_state['next_station'] = stations[curr_idx + 1]
+                save_current_state(current_state)
+                return jsonify({'status': 'success', 'next_station': current_state['next_station']})
+        except ValueError:
+            pass
+            
+    return jsonify({'status': 'error', 'message': '无法切换到下一站'}), 400
+
+def get_header_theme(line_color):
+    """计算头部对比度主题"""
+    if not line_color:
+        return '#ffffff', False
+    
+    try:
+        hex_color = line_color.lstrip('#')
+        if len(hex_color) == 3:
+            hex_color = ''.join([c*2 for c in hex_color])
+        if len(hex_color) != 6:
+            return '#ffffff', False
+            
+        r = int(hex_color[0:2], 16)
+        g = int(hex_color[2:4], 16)
+        b = int(hex_color[4:6], 16)
+        
+        yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000
+        is_light = yiq >= 150
+        return ('#333333' if is_light else '#ffffff'), is_light
+    except Exception:
+        return '#ffffff', False
 
 @app.route('/')
 def index():
@@ -425,6 +592,8 @@ def index():
         pass
     if line_color is None:
         line_color = fallback_get_line_color(current_state['line_name'])
+
+    header_text_color, is_light_theme = get_header_theme(line_color)
 
     # 根据direction计算两端站名用于展示（右侧为终点站）
     terminal_station = None
@@ -689,6 +858,8 @@ def index():
                            line_color=line_color,
                            line_display_name=line_display_name,
                            line_en_name=line_en_name,
+                           header_text_color=header_text_color,
+                           is_light_theme=is_light_theme,
                            terminal_station=terminal_station,
                            start_station=start_station,
                            route_services=route_services,
@@ -713,6 +884,8 @@ def line_map():
             pass
         if line_color is None:
             line_color = fallback_get_line_color(current_state['line_name'])
+
+        header_text_color, is_light_theme = get_header_theme(line_color)
 
         # 获取翻译数据
         trans_data = _get_trans_data()
@@ -936,24 +1109,26 @@ def line_map():
         except Exception:
             services_data = []
 
-        return render_template('line_map.html', 
-                                line_info=line_info,
-                                line_display_name=line_display_name,
-                                line_en_name=line_en_name,
-                                line_color=line_color,
-                                is_reversed=is_reversed,
-                                is_loop=is_loop,
-                                loop_has_terminal=loop_has_terminal,
-                                loop_terminal_station=loop_terminal_station,
-                                current_route_stations=current_route_stations,
-                                full_route_mode=full_route_mode,
-                                trans_data=trans_data,
-                                transfer_badges=transfer_badges,
-                                layout_mode=layout_mode,
-                                station_spacing_multiplier=station_spacing_multiplier,
-                                services=services_data,
-                                config=app_config,
-                                **current_state)
+        return render_template('line_map.html',
+                               line_info=line_info,
+                               line_display_name=line_display_name,
+                               line_en_name=line_en_name,
+                               line_color=line_color,
+                               header_text_color=header_text_color,
+                               is_light_theme=is_light_theme,
+                               is_reversed=is_reversed,
+                               is_loop=is_loop,
+                               loop_has_terminal=loop_has_terminal,
+                               loop_terminal_station=loop_terminal_station,
+                               current_route_stations=current_route_stations,
+                               full_route_mode=full_route_mode,
+                               trans_data=trans_data,
+                               transfer_badges=transfer_badges,
+                               layout_mode=layout_mode,
+                               station_spacing_multiplier=station_spacing_multiplier,
+                               services=services_data,
+                               config=app_config,
+                               **current_state)
     except Exception as e:
         error_msg = f"获取线路信息失败: {str(e)}"
         print(error_msg)
@@ -965,11 +1140,47 @@ def line_detail():
     try:
         line_name = current_state['line_name']
         route_name = current_state['route_name']
+
+        detail_style = 'default'
+        try:
+            data_dir = get_data_dir()
+            route_file = os.path.join(data_dir, 'route.json')
+            with open(route_file, 'r', encoding='utf-8') as f:
+                route_data_raw = json.load(f)
+            line_cfg = route_data_raw.get(line_name, {})
+            if not isinstance(line_cfg, dict):
+                line_cfg = {}
+            if 'detail_style' not in line_cfg:
+                line_cfg['detail_style'] = 'default'
+                route_data_raw[line_name] = line_cfg
+                save_json_file(route_file, route_data_raw)
+                if 'route.json' in _DATA_CACHE:
+                    del _DATA_CACHE['route.json']
+                if tools is not None:
+                    try:
+                        tools._load_data()
+                    except Exception as e:
+                        print(f"重载 RouteTools 数据失败: {e}")
+            detail_style = (line_cfg.get('detail_style') or 'default')
+        except Exception:
+            detail_style = 'default'
         
         # 获取富含英文名与换乘信息的线路数据
         line_info = None
         line_display_name = line_name
         line_en_name = None
+        
+        line_color = None
+        if tools is not None:
+            try:
+                line_color = tools.get_line_color(line_name)
+            except Exception:
+                pass
+        if line_color is None:
+            line_color = fallback_get_line_color(line_name)
+
+        header_text_color, is_light_theme = get_header_theme(line_color)
+
         if tools is not None:
             try:
                 line_info = tools.get_line_map_info(line_name, route_name)
@@ -1011,11 +1222,13 @@ def line_detail():
         next_station_info = None
         terminal_station = None
         direction = current_state.get('direction', 0)
+        next_station_index = 0
 
         if line_info:
             for i, station in enumerate(line_info):
                 if station.get('station_name') == current_state.get('next_station'):
                     next_station_info = station
+                    next_station_index = i
                     if i - 1 >= 0:
                         current_station_info = line_info[i - 1]
                     break
@@ -1075,6 +1288,8 @@ def line_detail():
 
         # 翻译数据
         trans_data = _get_trans_data()
+        station_data = _get_station_data()
+        color_data = _get_color_data()
         
         # 环线终点站按字段识别，序列保持原始顺序由前端按方向截取
         return render_template('line_detail.html',
@@ -1085,12 +1300,18 @@ def line_detail():
                               next_station_info=next_station_info,
                               transfer_lines_display=transfer_lines_display,
                               transfer_badges=transfer_badges,
+                              detail_style=detail_style,
+                              next_station_index=next_station_index,
                               line_color=line_color,
+                              header_text_color=header_text_color,
+                              is_light_theme=is_light_theme,
                               is_loop=is_loop,
                               loop_has_terminal=loop_has_terminal,
                               loop_terminal_station=loop_terminal_station,
                               terminal_station=terminal_station,
                               trans_data=trans_data,
+                              station_data=station_data,
+                              color_data=color_data,
                               config=app_config,
                               **current_state)
     except Exception as e:
@@ -1128,24 +1349,61 @@ def arrival():
         
         current_station_info = None
         next_station_info = None
+        direction = current_state.get('direction', 0)
         
         if line_info:
+            # 适配方向：如果为反向，则查找逻辑需要对应调整
+            # 我们不直接反转 line_info 以免影响其他逻辑，而是在查找时考虑方向
             for i, station in enumerate(line_info):
                 if station.get('station_name') == current_state.get('next_station'):
                     next_station_info = station
-                    if i - 1 >= 0:
-                        current_station_info = line_info[i - 1]
+                    # current_station 是上一站
+                    if direction == 0:
+                        if i - 1 >= 0:
+                            current_station_info = line_info[i - 1]
+                    else:
+                        if i + 1 < len(line_info):
+                            current_station_info = line_info[i + 1]
                     break
         
-        # 终点站（真实数据）
+        # 终点站处理：考虑环线与方向
         terminal_station = None
-        if tools is not None:
-            try:
-                terminal_station = tools.get_terminal_station(line_name, route_name)
-            except Exception:
-                pass
-        if terminal_station is None:
-            terminal_station = fallback_get_terminal_station(line_name, route_name)
+        is_loop = False
+        loop_has_terminal = False
+        try:
+            route_data = _get_route_data()
+            line_config = route_data.get(line_name, {})
+            is_loop = (line_config.get('type') == 'loop')
+            services = line_config.get('services', [])
+            for s in services:
+                name = s.get('type') or s.get('service_name')
+                if name == route_name:
+                    term = (s.get('terminal_station') or '').strip()
+                    loop_has_terminal = bool(term)
+                    break
+        except Exception:
+            pass
+
+        if line_info:
+            if is_loop and not loop_has_terminal:
+                # 无终点环线：不设置固定终点站
+                terminal_station = None
+            else:
+                # 线性线路或有终点环线：根据方向取两端
+                if direction == 1:
+                    terminal_station = line_info[0].get('station_name')
+                else:
+                    terminal_station = line_info[-1].get('station_name')
+        
+        # 回退：如果上述逻辑未获取到终点站且非无终点环线
+        if terminal_station is None and not (is_loop and not loop_has_terminal):
+            if tools is not None:
+                try:
+                    terminal_station = tools.get_terminal_station(line_name, route_name)
+                except Exception:
+                    pass
+            if terminal_station is None:
+                terminal_station = fallback_get_terminal_station(line_name, route_name)
         
         # 模拟出口与设施（数据文件未提供）
         exits = ['A口', 'B口', 'C口', 'D口']
@@ -1161,7 +1419,9 @@ def arrival():
         if line_color is None:
             line_color = fallback_get_line_color(line_name)
 
-        # 计算下一站的换乘线路（显示名与徽章），排除当前线路
+        header_text_color, is_light_theme = get_header_theme(line_color)
+
+        # 获取翻译数据计算下一站的换乘线路（显示名与徽章），排除当前线路
         transfer_lines_display = []
         transfer_badges = []
         if next_station_info and tools is not None:
@@ -1181,16 +1441,34 @@ def arrival():
             except Exception:
                 pass
         
+        # 获取车厢节数
+        route_data = _get_route_data()
+        line_config = route_data.get(line_name, {})
+        carriage_count = line_config.get('carriage_count', 6)
+        if isinstance(carriage_count, str):
+            try:
+                carriage_count = int(carriage_count)
+            except ValueError:
+                carriage_count = 6
+        
+        # 翻译数据
+        trans_data = _get_trans_data()
+        
         return render_template('arrival.html',
                               current_station_info=current_station_info,
                               line_display_name=line_display_name,
                               line_en_name=line_en_name,
                               next_station_info=next_station_info,
+                              terminal_station=terminal_station,
                               exits=exits,
                               facilities=facilities,
                               transfer_lines_display=transfer_lines_display,
                               transfer_badges=transfer_badges,
                               line_color=line_color,
+                              header_text_color=header_text_color,
+                              is_light_theme=is_light_theme,
+                              trans_data=trans_data,
+                              carriage_count=carriage_count,
                               config=app_config,
                               **current_state)
     except Exception as e:

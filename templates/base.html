@@ -17,25 +17,133 @@
         
         :root {
             --theme-color: {{ line_color or '#9b5de5' }};
-            --header-text-color: #ffffff;
+            --header-text-color: {{ header_text_color or '#ffffff' }};
         }
         
         .header {
             background-color: var(--theme-color) !important;
             background: var(--theme-color) !important;
             color: var(--header-text-color) !important;
-            transition: background-color 0.3s ease, color 0.3s ease;
+            /* 使用 grid 布局确保中间内容绝对居中 */
+            display: grid !important;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            padding: 15px 20px;
+            position: relative;
         }
 
-        .header .line-info {
-            color: var(--header-text-color) !important;
+        .header-left { 
+            justify-self: start;
+        }
+
+        .header-left-row { 
+            display: flex; 
+            align-items: center; 
+            gap: 15px; 
+        }
+
+        .line-sub-info {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 2px;
+            border-left: 2px solid rgba(255, 255, 255, 0.3);
+            padding-left: 15px;
+            margin-left: 5px;
+        }
+
+        .line-sub-info-en {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .header-center {
+            justify-self: center;
+            text-align: center;
+            grid-column: 2;
+        }
+
+        .header-right {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            gap: 20px;
+            justify-self: end;
+        }
+
+        /* 新的开门方向样式 */
+        .door-status-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
             background-color: rgba(255, 255, 255, 0.15);
+            padding: 5px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
-        /* 当背景为浅色时，调整 line-info 的背景色以增加对比度 */
-        [data-theme="light"] .header .line-info {
+        .door-icon-box {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .door-icon {
+            width: 20px;
+            height: 18px;
+            border: 2px solid currentColor;
+            position: relative;
+            border-radius: 2px;
+            opacity: 0.9;
+        }
+
+        .door-icon::after {
+            content: '';
+            position: absolute;
+            width: 2px;
+            height: 100%;
+            background-color: currentColor;
+            left: 50%;
+            transform: translateX(-50%);
+            box-shadow: 0 0 2px rgba(0,0,0,0.2);
+        }
+
+        .door-text-box {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.2;
+        }
+
+        .door-info-zh {
+            font-size: 16px;
+            font-weight: bold;
+        }
+
+        .door-info-en {
+            font-size: 10px;
+            opacity: 0.8;
+            max-width: 120px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        {% if is_light_theme %}
+        .door-status-wrapper {
+            background-color: rgba(0, 0, 0, 0.05);
+            border-color: rgba(0, 0, 0, 0.1);
+        }
+        .header .line-info {
             background-color: rgba(0, 0, 0, 0.1);
         }
+        {% else %}
+        .header .line-info {
+            background-color: rgba(255, 255, 255, 0.15);
+        }
+        {% endif %}
 
         .header .title, 
         .header .title span:not(.transfer-badge), 
@@ -55,39 +163,28 @@
             opacity: 0.9;
         }
 
-        /* 覆盖头部左侧布局：上下一列，首行横排 */
-        .header-left { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
-        .header-left-row { display: flex; align-items: center; gap: 15px; }
-    </style>
-    <script>
-        function updateHeaderContrast() {
-            const themeColor = "{{ line_color or '#9b5de5' }}";
-            const hex = themeColor.replace('#', '');
-            const r = parseInt(hex.substring(0, 2), 16);
-            const g = parseInt(hex.substring(2, 4), 16);
-            const b = parseInt(hex.substring(4, 6), 16);
-            
-            // 使用 YIQ 亮度公式
-            const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
-            // 调整阈值：原为 128，调高到 180 左右，使橙色、中等亮度绿色等偏向白色文字
-            const isLight = yiq >= 150;
-            
-            const textColor = isLight ? '#333333' : '#ffffff';
-            document.documentElement.style.setProperty('--header-text-color', textColor);
-            
-            if (isLight) {
-                document.documentElement.setAttribute('data-theme', 'light');
-            } else {
-                document.documentElement.removeAttribute('data-theme');
+        /* 响应式调整 */
+        @media (max-width: 768px) {
+            .header {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto auto;
+                gap: 10px;
+                padding: 10px;
+            }
+            .header-left, .header-center, .header-right {
+                justify-self: center;
+                text-align: center;
+                grid-column: 1;
+            }
+            .header-right {
+                align-items: center;
             }
         }
-
-        document.addEventListener('DOMContentLoaded', updateHeaderContrast);
-    </script>
+    </style>
     <script src="{{ url_for('static', filename='js/common.js') }}"></script>
     {% block head %}{% endblock %}
 </head>
-<body>
+<body {% if is_light_theme %}data-theme="light"{% endif %}>
     <header class="header">
         <div class="header-left">
             <div class="header-left-row">
@@ -99,32 +196,43 @@
                         {% if line_name.startswith('line_') %}{{ line_name[5:] }}号线{% else %}{{ line_name }}{% endif %}
                     {% endif %}
                     <br>
-                    <p style="font-size: 12px; text-align: center;">
+                    <span style="font-size: 12px; display: block; text-align: center;">
                         {% if line_en_name %}
                             {{ line_en_name }}
                         {% else %}
                             Line{% if line_name %}{% if line_name.startswith('line_') %}{{ line_name[5:] }}{% else %}{{ line_name }}{% endif %}{% endif %}
                         {% endif %}
-                    </p>
+                    </span>
                 </span>
+                <div class="line-sub-info">{% block header_subtitle %}{% endblock %}</div>
             </div>
-            <div class="line-sub-info">{% block header_subtitle %}{% endblock %}</div>
         </div>
         <div class="header-center">
             <h1 class="title">{% block page_title %}{% endblock %}</h1>
         </div>
         <div class="header-right">
-            <span class="time" id="current-time">00:00</span>
-            <script>
-                (function() {
-                    const now = new Date();
-                    const hours = now.getHours().toString().padStart(2, '0');
-                    const minutes = now.getMinutes().toString().padStart(2, '0');
-                    document.getElementById('current-time').textContent = hours + ':' + minutes;
-                })();
-            </script>
-            {% if door_side %}<span class="door-info">{% if door_side == '本侧' %}本侧开门{% else %}对侧开门{% endif %}</span>{% endif %}
-            {% if door_side %}<span class="door-info">Doors will open on {% if door_side == '本侧' %}this{% else %}the opposite{% endif %} side</span>{% endif %}
+            {% block header_right %}
+                {% if door_side %}
+                <div class="door-status-wrapper">
+                    <div class="door-icon-box">
+                        <div class="door-icon {% if door_side == '本侧' %}left{% else %}right{% endif %}"></div>
+                    </div>
+                    <div class="door-text-box">
+                        <span class="door-info-zh">{% if door_side == '本侧' %}本侧开门{% else %}对侧开门{% endif %}</span>
+                        <span class="door-info-en">Doors will open on {% if door_side == '本侧' %}this{% else %}the opposite{% endif %} side</span>
+                    </div>
+                </div>
+                {% endif %}
+                <span class="time" id="current-time">00:00</span>
+                <script>
+                    (function() {
+                        const now = new Date();
+                        const hours = now.getHours().toString().padStart(2, '0');
+                        const minutes = now.getMinutes().toString().padStart(2, '0');
+                        document.getElementById('current-time').textContent = hours + ':' + minutes;
+                    })();
+                </script>
+            {% endblock %}
         </div>
     </header>
 
