@@ -2,7 +2,7 @@
   "line_1": {
     "line_name": "1号线-Line 1",
     "type": "linear",
-    "layout": "two_line",
+    "layout": "one_line",
     "detail_style": "default",
     "carriage_count": 6,
     "station_spacing_multiplier": 1,

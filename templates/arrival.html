@@ -85,7 +85,7 @@
     /* 列车模型容器 */
     .train-container {
         width: 100%;
-        height: 350px; /* 默认大尺寸高度 */
+        min-height: 350px;
         position: relative;
         overflow: hidden;
         display: flex;
@@ -93,19 +93,30 @@
         justify-content: center;
         background-color: transparent;
         margin-top: 20px;
+        transition: all 0.5s ease;
     }
-    .train-container.is-mini {
-        height: 240px; /* 缩小样式高度 */
-        margin-top: 5px;
+
+    /* 整体缩放控制 */
+    .train-view-wrapper {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        transition: all 0.5s ease;
     }
 
     .train-wrapper {
-        position: absolute;
+        position: relative;
         display: flex;
         align-items: flex-end;
-        transition: transform 1.5s ease-out;
+        transition: transform 1.5s ease-out, scale 0.5s ease;
         transform: translateX({% if direction|int == 0 %}-100%{% else %}100%{% endif %});
         transform-origin: center bottom;
+        z-index: 10;
+        /* 基础缩放：根据视口宽度动态调整 */
+        scale: clamp(0.65, 85vw / 1200, 1);
     }
 
     /* 侧边文字样式 */
@@ -115,45 +126,81 @@
         transform: translateY(-50%);
         display: flex;
         flex-direction: column;
-        width: 320px;
+        width: 280px;
         pointer-events: none;
         opacity: 0;
-        transition: opacity 0.5s ease-in 1s;
+        transition: opacity 0.5s ease-in 1s, transform 0.5s ease;
         align-items: center;
         text-align: center;
         z-index: 20;
     }
     .train-side-info.left { left: 2%; } 
     .train-side-info.right { right: 2%; } 
-    .train-container.is-mini .train-side-info.left { left: 1%; } 
-    .train-container.is-mini .train-side-info.right { right: 1%; } 
     .train-side-info.visible { opacity: 1; }
 
     /* 轨道横线样式 */
     .train-track {
         position: absolute;
-        bottom: 143px; /* 默认高度 */
-        width: 55%;
+        bottom: 143px;
+        width: 60%;
         height: 4px;
         background-color: #333;
         left: 50%;
         transform: translateX(-50%);
         border-radius: 2px;
+        transition: all 0.5s ease;
     }
-    .train-container.is-mini .train-track {
-        bottom: 96px; /* 缩小高度 */
-        width: 60%;
-        height: 3px;
+
+    /* 响应式调整 */
+    @media (max-width: 1200px) {
+        .train-side-info { width: 220px; }
+        .train-track { width: 70%; bottom: 148px; }
+    }
+
+    @media (max-width: 900px) {
+        .train-container {
+            min-height: 450px;
+            align-items: flex-start;
+            padding-top: 20px;
+        }
+        .train-view-wrapper {
+            flex-direction: column;
+            gap: 20px;
+            justify-content: flex-start;
+        }
+        .train-wrapper { 
+            scale: 0.55;
+            transform: translateX(0) !important;
+            margin-bottom: 20px;
+        }
+        .train-track {
+            width: 90%;
+            top: 105px; /* 适配缩放后的位置 */
+            bottom: auto;
+        }
+        .train-side-info {
+            position: relative;
+            top: 0;
+            left: 0 !important;
+            right: 0 !important;
+            transform: none;
+            width: 100%;
+            opacity: 1 !important;
+            margin-top: 10px;
+        }
+        .train-side-info.left { order: 2; }
+        .train-side-info.right { order: 3; }
+        
+        .side-label-zh { font-size: 18px !important; }
+        .side-label-en { font-size: 11px !important; }
+        .side-station-name { font-size: 26px !important; }
+        .side-transfer-badge { width: 20px !important; height: 20px !important; font-size: 10px !important; }
+        .side-transfer-label { font-size: 16px !important; }
     }
 
     .side-label-zh { font-size: 24px; font-weight: bold; color: #333; margin-bottom: 4px; white-space: nowrap; }
-    .train-container.is-mini .side-label-zh { font-size: 20px; }
-    
-    .side-label-en { font-size: 16px; color: #666; line-height: 1.2; }
-    .train-container.is-mini .side-label-en { font-size: 14px; }
-    
+    .side-label-en { font-size: 14px; color: #666; line-height: 1.2; }
     .side-station-name { font-size: 36px; font-weight: bold; color: var(--theme-color); margin-top: 8px; white-space: nowrap; }
-    .train-container.is-mini .side-station-name { font-size: 32px; }
     
     /* 换乘样式 */
     .side-transfers {
@@ -298,12 +345,14 @@
 {% endblock %}
 
 {% block content %}
-<div class="train-container {% if (carriage_count|default(6))|int > 6 %}is-mini{% endif %}">
+<div class="train-container">
     <div class="train-track"></div>
-    <div class="train-side-info left" id="info-left"></div>
-    <div class="train-side-info right" id="info-right"></div>
-    <div class="train-wrapper" id="train-wrapper">
-        <!-- 车厢将由JS生成 -->
+    <div class="train-view-wrapper">
+        <div class="train-side-info left" id="info-left"></div>
+        <div class="train-wrapper" id="train-wrapper">
+            <!-- 车厢将由JS生成 -->
+        </div>
+        <div class="train-side-info right" id="info-right"></div>
     </div>
 </div>
 {% endblock %}
