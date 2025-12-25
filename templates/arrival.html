@@ -115,8 +115,9 @@
         transform: translateX({% if direction|int == 0 %}-100%{% else %}100%{% endif %});
         transform-origin: center bottom;
         z-index: 10;
-        /* 基础缩放：根据视口宽度动态调整 */
-        scale: clamp(0.65, 85vw / 1200, 1);
+        /* 基础缩放：根据视口宽度动态调整，同时考虑编组长度 (>6节自动缩小) */
+        {% set base_scale = 0.85 if (carriage_count|default(6))|int <= 6 else 0.7 %}
+        scale: clamp(0.55, ({{ base_scale }} * 85vw) / 1200, {{ base_scale }});
     }
 
     /* 侧边文字样式 */
@@ -249,8 +250,9 @@
 
     /* 列车车厢通用样式 */
     .carriage {
-        width: 120px;
-        height: 60px;
+        width: {% if (carriage_count|default(6))|int > 6 %}100px{% else %}120px{% endif %};
+        height: {% if (carriage_count|default(6))|int > 6 %}48px{% else %}60px{% endif %};
+        top: {% if (carriage_count|default(6))|int > 6 %}6px{% else %}0px{% endif %};
         border: 2px solid #333;
         background-color: #fff;
         position: relative;
@@ -258,63 +260,44 @@
         align-items: center;
         justify-content: center;
         font-weight: bold;
-        font-size: 24px;
+        font-size: {% if (carriage_count|default(6))|int > 6 %}20px{% else %}24px{% endif %};
         color: #9b5de5;
         flex-shrink: 0;
-    }
-    .train-container.is-mini .carriage {
-        width: 100px;
-        height: 48px;
-        font-size: 20px;
     }
 
     /* 车头/车尾形状 */
     .carriage-head-left {
-        border-top-left-radius: 30px;
-        border-bottom-left-radius: 10px;
+        border-top-left-radius: {% if (carriage_count|default(6))|int > 6 %}24px{% else %}30px{% endif %};
+        border-bottom-left-radius: {% if (carriage_count|default(6))|int > 6 %}8px{% else %}10px{% endif %};
         border-left-width: 3px;
-    }
-    .train-container.is-mini .carriage-head-left {
-        border-top-left-radius: 24px;
-        border-bottom-left-radius: 8px;
     }
     
     .carriage-head-right {
-        border-top-right-radius: 30px;
-        border-bottom-right-radius: 10px;
+        border-top-right-radius: {% if (carriage_count|default(6))|int > 6 %}24px{% else %}30px{% endif %};
+        border-bottom-right-radius: {% if (carriage_count|default(6))|int > 6 %}8px{% else %}10px{% endif %};
         border-right-width: 3px;
-    }
-    .train-container.is-mini .carriage-head-right {
-        border-top-right-radius: 24px;
-        border-bottom-right-radius: 8px;
     }
 
     /* 当前车厢闪烁效果 */
     .current-carriage-overlay {
         position: absolute;
-        top: -80px;
+        top: {% if (carriage_count|default(6))|int > 6 %}-70px{% else %}-80px{% endif %};
         left: 50%;
         transform: translateX(-50%);
-        width: 140px;
-        height: 70px;
+        width: {% if (carriage_count|default(6))|int > 6 %}120px{% else %}140px{% endif %};
+        height: {% if (carriage_count|default(6))|int > 6 %}60px{% else %}70px{% endif %};
         background-color: rgba(255, 59, 48, 0.7);
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         color: #fff;
-        font-size: 14px;
+        font-size: {% if (carriage_count|default(6))|int > 6 %}12px{% else %}14px{% endif %};
         border-radius: 5px;
         animation: blink 0.5s infinite alternate;
         z-index: 10;
         text-align: center;
         pointer-events: none;
-    }
-    .train-container.is-mini .current-carriage-overlay {
-        top: -70px;
-        width: 120px;
-        height: 60px;
-        font-size: 12px;
     }
 
     .current-carriage-overlay::after {
