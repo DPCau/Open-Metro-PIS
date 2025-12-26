@@ -608,6 +608,7 @@ function createZigzagLayout() {
             const mainStations = mainService.stations;
             const branchStations = branchService.stations;
             let forkIndex = -1;
+            let branchIsOnlyExtension = false;
             const len = Math.min(mainStations.length, branchStations.length);
             for (let i = 0; i < len; i++) {
                 if (mainStations[i] !== branchStations[i]) {
@@ -616,7 +617,16 @@ function createZigzagLayout() {
                 forkIndex = i;
             }
             
-            if (forkIndex >= 0 && forkIndex < mainStations.length - 1 && forkIndex < branchStations.length - 1) {
+            if (forkIndex === -1 && branchStations.length > 0) {
+                 const firstBranchStation = branchStations[0];
+                 const foundIdx = mainStations.indexOf(firstBranchStation);
+                 if (foundIdx !== -1) {
+                     forkIndex = foundIdx;
+                     branchIsOnlyExtension = true;
+                 }
+             }
+            
+            if (forkIndex >= 0 && forkIndex < mainStations.length - 1 && (branchIsOnlyExtension ? branchStations.length > 1 : forkIndex < branchStations.length - 1)) {
                 function getStationObj(name) {
                     let s = lineInfo.find(s => s.station_name === name);
                     if (s) return s;
@@ -632,7 +642,7 @@ function createZigzagLayout() {
                 const isDirReverse = direction === 1;
                 const forkIndexOrig = forkIndex;
                 const mainStationObjs = (isDirReverse ? mainStations.slice().reverse().map(getStationObj) : mainStations.map(getStationObj));
-                const branchStationObjs = branchStations.slice(forkIndexOrig + 1).map(getStationObj);
+                const branchStationObjs = branchStations.slice(branchIsOnlyExtension ? 1 : forkIndexOrig + 1).map(getStationObj);
                 
                 const rowMain = document.createElement('div');
                 rowMain.className = 'line-row';
@@ -649,15 +659,23 @@ function createZigzagLayout() {
                 
                 const containerWidth2 = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
                 const availableWidth2 = Math.max(0, containerWidth2 - margin * 2);
-                let gap1 = N > 1 ? (availableWidth2 - N * stationWidth) / (N - 1) : 0;
-                gap1 = Math.max(8, gap1);
+                const gapMain = N > 1 ? (availableWidth2 - N * stationWidth) / (N - 1) : 0;
+                let gap1 = gapMain;
+                const branchCount = branchStationObjs.length;
+                if (branchCount > 0) {
+                    const totalStationCount = (forkIndexOrig + 2) + branchCount;
+                    const gapCoeff = (forkIndexOrig + 2) + Math.max(0, branchCount - 1);
+                    const gapBranch = gapCoeff > 0 ? (availableWidth2 - totalStationCount * stationWidth) / gapCoeff : gapMain;
+                    gap1 = Math.min(gap1, gapBranch);
+                }
+                gap1 = Math.max(0, gap1);
                 
                 const baseGap = 25 * mapScale;
                 const ratio = Math.max(0.6, Math.min(1.0, gap1 / baseGap));
                 metroLine.style.setProperty('--rail-thickness', Math.round(15 * ratio) + 'px');
                 metroLine.style.setProperty('--arrow-size', Math.round(25 * ratio) + 'px');
                 
-                rowMain.style.justifyContent = 'flex-start';
+                rowMain.style.justifyContent = isDirReverse ? 'flex-end' : 'flex-start';
                 rowMain.style.gap = gap1 + 'px';
                 metroLine.appendChild(rowMain);
                 
@@ -685,7 +703,7 @@ function createZigzagLayout() {
                     rowBranch.style.setProperty('--rail-right', 'auto');
                 }
                 
-                rowBranch.style.setProperty('--rail-width', branchRailWidth*0.7 + 'px');
+                rowBranch.style.setProperty('--rail-width', branchRailWidth - 20 + 'px');
                 
                 rowBranch.dataset.startIndex = String(forkIndexOrig + 1);
                 rowBranch.dataset.endIndex = String(forkIndexOrig + 1 + branchStationObjs.length - 1);
@@ -987,18 +1005,6 @@ function computeRailAndConnectors() {
                     }
                 }
 
-                // If fullRouteMode is active, further constrain endColorIndex by active range in this row
-                if (fullRouteMode) {
-                    const rowActiveIndices = stations.map((s, i) => currentRouteSet.has(s.querySelector('.station-name').textContent) ? i : -1).filter(i => i >= 0);
-                    if (rowActiveIndices.length > 0) {
-                        const localActiveEnd = Math.max(...rowActiveIndices);
-                        endColorIndex = Math.min(endColorIndex, localActiveEnd);
-                    } else {
-                        // No active stations in this row
-                        startColorIndex = -1;
-                        endColorIndex = -1;
-                    }
-                }
             } else {
                 // Next station NOT in this row.
                 if (row.classList.contains('branch-row')) {
@@ -1059,6 +1065,25 @@ function computeRailAndConnectors() {
                     }
                 }
             }
+
+            if (fullRouteMode || window.isCustomBranchMode) {
+                const rowActiveIndices = stations
+                    .map((s, i) => currentRouteSet.has(s.querySelector('.station-name').textContent) ? i : -1)
+                    .filter(i => i >= 0);
+                if (rowActiveIndices.length > 0) {
+                    const localActiveStart = Math.min(...rowActiveIndices);
+                    const localActiveEnd = Math.max(...rowActiveIndices);
+                    if (startColorIndex !== -1) startColorIndex = Math.max(startColorIndex, localActiveStart);
+                    if (endColorIndex !== -1) endColorIndex = Math.min(endColorIndex, localActiveEnd);
+                    if (startColorIndex > localActiveEnd || endColorIndex < localActiveStart) {
+                        startColorIndex = -1;
+                        endColorIndex = -1;
+                    }
+                } else {
+                    startColorIndex = -1;
+                    endColorIndex = -1;
+                }
+            }
             
             // Mark passed stations (grey out) for current row if next is present
             if (nextStationInRowIndex >= 0) {
@@ -1092,7 +1117,7 @@ function computeRailAndConnectors() {
                  const segBIdx = segAIdx + 1;
                  
                 // Skip arrows for inactive segments in fullRouteMode
-                if (fullRouteMode) {
+                if (fullRouteMode || window.isCustomBranchMode) {
                     const nameA = stations[seg].querySelector('.station-name').textContent;
                     const nameB = stations[seg + 1].querySelector('.station-name').textContent;
                     if (!currentRouteSet.has(nameA) || !currentRouteSet.has(nameB)) {
@@ -1101,30 +1126,39 @@ function computeRailAndConnectors() {
                 }
 
                  let colorClass = 'black'; // Future = Black/Theme
+                 const direction = parseInt(document.getElementById('direction-data')?.textContent || '0');
                  
                  // Passed = Gray
                  if (nextStationInRowIndex >= 0) {
-                     if (seg < nextStationInRowIndex - 1) colorClass = 'gray'; // Before next station -> Passed
-                     else if (seg === nextStationInRowIndex - 1) colorClass = 'red'; // Approaching next
+                     if (direction === 1) { // Reverse
+                         if (seg > nextStationInRowIndex) colorClass = 'gray';
+                         else if (seg === nextStationInRowIndex) colorClass = 'red'; // Approaching next
+                     } else { // Forward
+                         if (seg < nextStationInRowIndex - 1) colorClass = 'gray'; // Before next station -> Passed
+                         else if (seg === nextStationInRowIndex - 1) colorClass = 'red'; // Approaching next
+                     }
                  } else {
                      // Next not in row.
-                     // If on branch, 0..Fork are passed.
-                     if (seg < forkIndex) {
+                     // Check Branch Status
+                     const branchRow = document.querySelector('.branch-row');
+                     const isBranchActive = branchRow && !branchRow.classList.contains('inactive-row');
+
+                     if (isBranchActive && seg >= forkIndex) {
+                         // Segments after fork on Main Row when Branch is Active
+                         // These are Inactive Main Route segments -> Gray
                          colorClass = 'gray';
-                     }
-                     else {
-                         // Segments after fork on Main Row (when Next is on Branch)
-                         // These are Inactive Main Route segments.
-                         // Should probably be Gray or hidden arrows?
-                         // Let's make them black (default) but they sit on gray rail.
+                     } else if (seg < forkIndex) {
+                         // Segments before fork
+                         if (direction === 1) {
+                             // Reverse: Branch -> Fork -> Main(0..Fork).
+                             // Main(0..Fork) is Future -> Black.
+                         } else {
+                             // Forward: Main(0..Fork) -> Branch.
+                             // Main(0..Fork) is Passed -> Gray.
+                             colorClass = 'gray';
+                         }
                      }
                  }
-                 
-                 // If segment is inactive (e.g. past fork on Main Row when Branch is active)
-                 // Or past fork on Branch Row when Main is active (handled by inactive-row)
-                 
-                 // Skip inactive segments arrows
-                 // if (seg >= forkIndex && nextStationInRowIndex < 0) continue; 
                  
                  const aRect = stations[seg].getBoundingClientRect();
                  const bRect = stations[seg + 1].getBoundingClientRect();
@@ -1267,12 +1301,12 @@ function computeRailAndConnectors() {
                  }
              }
              
-             if (startColorIndex >= 0) {
-                 const direction = parseInt(document.getElementById('direction-data')?.textContent || '0');
-                 let endColorIndex = (direction === 1) ? 0 : (stations.length - 1);
+            if (startColorIndex >= 0) {
+                const direction = parseInt(document.getElementById('direction-data')?.textContent || '0');
+                let endColorIndex = (direction === 1) ? 0 : (stations.length - 1);
 
                 // If fullRouteMode is active, further constrain active range in this row
-                if (fullRouteMode) {
+                if (fullRouteMode || window.isCustomBranchMode) {
                     const rowActiveIndices = stations.map((s, i) => currentRouteSet.has(s.querySelector('.station-name').textContent) ? i : -1).filter(i => i >= 0);
                     if (rowActiveIndices.length > 0) {
                         const localActiveStart = Math.min(...rowActiveIndices);
@@ -1348,7 +1382,7 @@ function computeRailAndConnectors() {
                  const segBIdx = segAIdx + 1;
                  
                 // Skip arrows for inactive segments in fullRouteMode
-                if (fullRouteMode) {
+                if (fullRouteMode || window.isCustomBranchMode) {
                     const nameA = stations[seg].querySelector('.station-name').textContent;
                     const nameB = stations[seg + 1].querySelector('.station-name').textContent;
                     if (!currentRouteSet.has(nameA) || !currentRouteSet.has(nameB)) {
@@ -1357,12 +1391,24 @@ function computeRailAndConnectors() {
                 }
 
                  let colorClass = 'black';
+                 const direction = parseInt(document.getElementById('direction-data')?.textContent || '0');
+                 
                  if (nextStationInRowIndex >= 0) {
-                     if (seg < nextStationInRowIndex - 1) colorClass = 'gray';
-                     else if (seg === nextStationInRowIndex - 1) colorClass = 'red';
+                     if (direction === 1) { // Reverse
+                         if (seg > nextStationInRowIndex) colorClass = 'gray';
+                         else if (seg === nextStationInRowIndex) colorClass = 'red';
+                     } else { // Forward
+                         if (seg < nextStationInRowIndex - 1) colorClass = 'gray';
+                         else if (seg === nextStationInRowIndex - 1) colorClass = 'red';
+                     }
                  } else {
-                     // Entire row is future
-                     colorClass = 'black';
+                     // Entire row is future or passed
+                     // Check if first station is passed (marked in previous step)
+                     if (stations[0].querySelector('.station-circle').classList.contains('passed')) {
+                         colorClass = 'gray';
+                     } else {
+                         colorClass = 'black';
+                     }
                  }
                  
                  const aRect = stations[seg].getBoundingClientRect();

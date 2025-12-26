@@ -323,5 +323,24 @@
       }
     ],
     "detail_style": "default"
+  },
+  "line_92": {
+    "line_name": "蓉2号线-Line 2 (Tram)",
+    "type": "linear",
+    "layout": "one_line",
+    "detail_style": "default",
+    "carriage_count": 5,
+    "station_spacing_multiplier": 1,
+    "services": [
+      {
+        "type": "route1",
+        "stations": ["郫县西站", "梨园路", "望丛祠", "何公路", "晨光", "花石", "大禹东路", "红展东路", "红旗大道", "德富大道", "天源路", "天映路", "安埠", "天欣路", "合作路", "合信路", "电子科大", "锦城学院", "新业路", "土龙路", "联工", "成都西站"]
+      },
+      {
+        "type": "route2",
+        "branch": "route1",
+        "stations": ["新业路", "百叶路", "晨风", "天河路", "龙吟", "西南交大犀浦站", "犀方路", "国宁", "大田", "西华大学", "双林村", "金土", "技师学院", "仁和"]
+      }
+    ]
   }
 }
