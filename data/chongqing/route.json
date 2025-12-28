@@ -30,7 +30,8 @@
         "service_name": "route1",
         "stations": ["朝天门", "小什字", "较场口", "七星岗", "两路口", "鹅岭", "大坪", "石油路", "歇台子", "石桥铺", "高庙村", "马家岩", "小龙坎", "沙坪坝", "杨公桥", "烈士墓", "磁器口", "石井坡", "双碑", "赖家桥", "微电园", "陈家桥", "大学城", "尖顶坡", "璧山"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_2": {
     "line_name": "2号线-Line 2",
@@ -68,7 +69,8 @@
         "service_name": "route3",
         "stations": ["四公里", "南坪", "工贸", "铜元局", "两路口", "牛角沱", "华新街", "观音桥", "红旗河沟", "嘉州路", "郑家院子", "唐家院子", "狮子坪", "重庆北站南广场", "龙头寺"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_空港": {
     "line_name": "空港线-Line 3 Konggang",
@@ -81,26 +83,28 @@
         "service_name": "route1",
         "stations": ["碧津", "双凤桥", "空港广场", "高堡湖", "观音岩", "举人坝"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_4": {
-    "line_name": "4号线",
+    "line_name": "4号线-Line 4",
     "type": "linear",
     "layout": "one_line",
-    "carriage_count":6,
+    "carriage_count": 6,
     "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
         "stations": ["民安大道", "重庆北站北广场", "头塘", "保税港", "寸滩", "黑石子", "港城", "太平冲", "唐家沱", "铁山坪", "鹿栖", "果园物流枢纽", "鱼嘴", "雁坪", "石河清", "复盛", "三板溪", "龙驿大道", "龙兴", "高石塔", "普福", "桐梓林", "石船", "黄岭"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_5": {
     "line_name": "5号线-Line 5",
     "type": "linear",
     "layout": "two_line",
-    "carriage_count":6,
+    "carriage_count": 6,
     "station_spacing_multiplier": 1,
     "services": [
       {
@@ -111,13 +115,14 @@
         "service_name": "route2",
         "stations": ["园博中心", "丹鹤", "湖霞街", "重光", "和睦路", "人和", "幸福广场", "冉家坝", "大龙山", "大石坝", "忠恕沱", "红岩村", "歇台子", "石桥铺", "石新路", "巴山", "凤西路", "重庆西站", "华岩寺", "华成路", "半山", "中梁山", "金建路", "华岩中心", "跳磴"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_江跳": {
     "line_name": "江跳线-Line Jiangtiao",
     "type": "linear",
     "layout": "one_line",
-    "carriage_count":6,
+    "carriage_count": 6,
     "station_spacing_multiplier": 1,
     "services": [
       {
@@ -128,13 +133,14 @@
         "service_name": "route2",
         "stations": ["石桥铺", "石新路", "巴山", "凤西路", "重庆西站", "华岩寺", "华成路", "半山", "中梁山", "金建路", "华岩中心", "跳磴", "石林寺", "九龙园", "双福", "享堂", "江津高铁站", "圣泉寺"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_6": {
     "line_name": "6号线-Line 6",
     "type": "linear_multi_service",
     "layout": "one_line",
-    "carriage_count":6,
+    "carriage_count": 6,
     "station_spacing_multiplier": 1,
     "services": [
       {
@@ -149,26 +155,28 @@
         "service_name": "route3",
         "stations": ["重庆东站", "桃花桥", "百乐园", "刘家坪"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_国博": {
     "line_name": "国博线-Line 6 Guobo",
     "type": "linear",
     "layout": "one_line",
-    "carriage_count":6,
+    "carriage_count": 6,
     "station_spacing_multiplier": 1,
     "services": [
       {
         "service_name": "route1",
         "stations": ["礼嘉", "欢乐谷", "黄茅坪", "高义口", "国博中心", "悦来", "王家庄", "清溪河", "刘家院子", "思源", "复兴", "红岩坪", "沙河坝"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_9": {
     "line_name": "9号线-Line 9",
     "type": "linear",
     "layout": "one_line",
-    "carriage_count":6,
+    "carriage_count": 6,
     "station_spacing_multiplier": 1,
     "services": [
       {
@@ -179,13 +187,14 @@
         "service_name": "route1",
         "stations": ["高滩岩", "天梨路", "沙坪坝", "小龙坎", "土湾", "红岩村", "富华路", "化龙桥", "李家坪", "观音桥", "鲤鱼池", "五里店", "溉澜溪", "头塘", "保税港", "何家梁", "上果路", "上湾路", "青岗坪", "宝圣湖", "兴科大道"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_10": {
     "line_name": "10号线-Line 10",
     "type": "linear",
     "layout": "one_line",
-    "carriage_count":6,
+    "carriage_count": 6,
     "station_spacing_multiplier": 1,
     "services": [
       {
@@ -197,7 +206,8 @@
         "group": "1",
         "stations": ["兰花路", "万寿路", "七星岗", "曾家岩", "鲤鱼池", "红土地", "重庆北站南广场", "重庆北站北广场", "上湾路", "江北机场T3航站楼", "江北机场T2航站楼", "中央公园西", "王家庄"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_18": {
     "line_name": "18号线-Line 18",
@@ -210,7 +220,8 @@
         "service_name": "route1",
         "stations": ["富华路", "歇台子", "奥体中心", "石坪桥", "杨家坪", "滩子口", "黄桷坪", "四川美术学院", "电厂", "李家沱大桥", "重庆理工大学", "花溪工业园", "巴滨路湿地公园", "茄子溪", "白居寺", "伏牛溪", "金鳌山", "跳磴", "跳磴南"]
       }
-    ]
+    ],
+    "detail_style": "default"
   },
   "line_璧铜": {
     "line_name": "璧铜线-Line 18 Bitong",
@@ -225,7 +236,7 @@
       }
     ]
   },
-  "line_4_0_5_express": {
+  "line_直快": {
     "line_name": "直快列车-Express",
     "type": "linear",
     "layout": "one_line",
@@ -236,6 +247,7 @@
         "service_name": "route1",
         "stations": ["唐家沱", "头塘", "重庆北站北广场", "民安大道", "冉家坝", "沙坪坝", "重庆图书馆", "上桥", "重庆西站", "金建路", "华岩中心", "跳磴"]
       }
-    ]
+    ],
+    "detail_style": "default"
   }
 }

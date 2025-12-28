@@ -39,10 +39,13 @@ Mirror address in China Mainland (synchronized every 8 hours): [Gitea Mirror](ht
 
 ## Update Notes
 
-<div style="height: 150px; overflow-y: auto;">
-
+- 2025-12-28 Fixed CRT Direct Express train issues, added Line 4 depot return route
 - 2025-12-26 Added Rong Line 2 content, improved branch line detection
 - 2025-12-25 Added arrival station page, bound new key operations, fixed loop line issues, added arrival page, added new display mode for detail page, added deployment watermark for anti-theft demo, adapted for mobile.
+
+<details>
+<summary>Click to expand/collapse update history</summary>
+
 - 2025-12-24 Added key operation mode, synchronized with overall theme color.
 - 2025-12-23 Fixed fork reverse direction issues, added two_line mode for loop lines.
 - 2025-12-21 Removed some routes due to temporary closures, replaced README demonstrations.
@@ -51,7 +54,7 @@ Mirror address in China Mainland (synchronized every 8 hours): [Gitea Mirror](ht
 - 2025-12-09 Fixed discontinuity in loop line detail page, loop line terminals are now strictly based on `terminal_station`.
 - 2025-12-07 Updated Line 13 and 30 content.
 
-</div>
+</details>
 
 ## Project Introduction
 
