@@ -7,7 +7,7 @@
     {% set ring_label = '内环运行' if direction|int == 1 else '外环运行' %}
     {% if loop_has_terminal and loop_terminal_station %}
         {{ ring_label }} 终点站：<strong>{{ loop_terminal_station }}</strong>
-        <div class="line-sub-info-en">{% if direction|int == 1 %}Inner Loop{% else %}Outer Loop{% endif %} Terminal: <strong>{{ trans_data.get(loop_terminal_station, loop_terminal_station).replace('<br>', ' ') }}</strong></div>
+        <div class="line-sub-info-en">{% if direction|int == 1 %}Inner Loop{% else %}Outer Loop{% endif %} Terminal: <strong>{{ trans_data.get(loop_terminal_station, loop_terminal_station or '').replace('<br>', ' ') if trans_data.get(loop_terminal_station, loop_terminal_station or '') else '' }}</strong></div>
     {% else %}
         <strong>{{ ring_label }}</strong>
         <div class="line-sub-info-en">{% if direction|int == 1 %}Inner Loop{% else %}Outer Loop{% endif %}</div>
@@ -24,7 +24,7 @@
         {% set terminal_station_for_dir = (line_info[-1].station_name if direction|int == 0 else line_info[0].station_name) %}
     {% endif %}
     终点站：<strong>{{ terminal_station_for_dir }}</strong>
-    <div class="line-sub-info-en">Terminal: <strong>{{ trans_data.get(terminal_station_for_dir, terminal_station_for_dir).replace('<br>', ' ') }}</strong></div>
+    <div class="line-sub-info-en">Terminal: <strong>{{ trans_data.get(terminal_station_for_dir, terminal_station_for_dir or '').replace('<br>', ' ') if trans_data.get(terminal_station_for_dir, terminal_station_for_dir or '') else '' }}</strong></div>
 {% endif %}
 {% endblock %}
 
@@ -46,7 +46,7 @@
             {% endif %}
         </div>
         <span class="next-station-name">{{ next_station }}</span>
-        <span class="next-station-name-en">{{ trans_data.get(next_station, next_station).replace('<br>', ' ') }}</span>
+        <span class="next-station-name-en">{{ trans_data.get(next_station, next_station or '').replace('<br>', ' ') if trans_data.get(next_station, next_station or '') else '' }}</span>
     </div>
 {% endblock %}
 
@@ -515,8 +515,12 @@
                     {% endfor %}
                 {% else %}
                     {# 普通线路或有终点环线：原有逻辑 #}
+                    {% set window_size = 5 %}
                     {% set start_idx = (current_next_idx - 1) if (current_next_idx - 1) >= 0 else 0 %}
-                    {% set display_stations = directional_info[start_idx : start_idx + 5] %}
+                    {% if total_stations > window_size and (start_idx + window_size) > total_stations %}
+                        {% set start_idx = total_stations - window_size %}
+                    {% endif %}
+                    {% set display_stations = directional_info[start_idx : start_idx + window_size] %}
 
                     {% for s in display_stations %}
                         {% set loop_idx = start_idx + loop.index0 %}
@@ -737,16 +741,6 @@ function layoutLocalRow() {
     const container = document.querySelector('.local-line-container');
     if (!Array.isArray(lineInfo) || !row || !container || !nextStationName) return;
 
-    // 针对有终点的环线，旋转 lineInfo 使其以“起点”开始
-    if (isLoop && loopHasTerminal && loopTerminalStation) {
-        let base = (direction === 0 || direction === '0') ? [...lineInfo] : [...lineInfo].reverse();
-        const termIdx = base.findIndex(s => s.station_name === loopTerminalStation);
-        if (termIdx >= 0) {
-            const startOffset = (termIdx + 1) % base.length;
-            lineInfo = base.slice(startOffset).concat(base.slice(0, startOffset));
-        }
-    }
-
     // 计算可见数量（至少3），按宽度增加
     const containerWidth = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
     const stationBlockWidth = 140; // 节点+标签的估算宽度
@@ -755,8 +749,7 @@ function layoutLocalRow() {
 
     const dir = (direction === 1 || direction === '1') ? 1 : 0;
     if (isLoop && loopHasTerminal && loopTerminalStation) {
-        let ordered = lineInfo.slice();
-        if (dir === 1) ordered.reverse();
+        let ordered = dir === 1 ? lineInfo.slice().reverse() : lineInfo.slice();
         const n = ordered.length;
         if (!n) return;
 
@@ -781,6 +774,16 @@ function layoutLocalRow() {
         for (let idx = nextIdx; rightIdxs.length < maxCount && idx < n; idx++) {
             rightIdxs.push(idx);
             if (ordered[idx]?.station_name === loopTerminalStation) break;
+        }
+
+        const desiredTotal = Math.min(maxByWidth, n);
+        let needLeft = desiredTotal - (leftIdxs.length + rightIdxs.length);
+        if (needLeft > 0) {
+            for (let idx = nextIdx - 1; needLeft > 0 && idx >= 0; idx--) {
+                if (leftIdxs.includes(idx) || rightIdxs.includes(idx)) continue;
+                leftIdxs.unshift(idx);
+                needLeft--;
+            }
         }
 
         row.innerHTML = '';
@@ -867,10 +870,35 @@ function layoutLocalRow() {
         }
     }
 
+    const desiredTotal = Math.min(maxByWidth, n);
+    let needLeft = desiredTotal - (leftIdxs.length + rightIdxs.length);
+    if (needLeft > 0) {
+        const used = new Set();
+        leftIdxs.forEach(v => used.add(v));
+        rightIdxs.forEach(v => used.add(v));
+        const dirVal = (direction === 1 || direction === '1') ? 1 : 0;
+        let idx = dirVal === 1 ? (i + 1) : (i - 1);
+        let looped = false;
+        while (needLeft > 0) {
+            if (isLoop && !loopHasTerminal) {
+                if (idx < 0) { idx = n - 1; looped = true; }
+                if (idx >= n) { idx = 0; looped = true; }
+                if (looped && idx === i) break;
+            } else {
+                if (idx < 0 || idx >= n) break;
+            }
+            if (!used.has(idx)) {
+                leftIdxs.unshift(idx);
+                used.add(idx);
+                needLeft--;
+            }
+            idx = dirVal === 1 ? (idx + 1) : (idx - 1);
+        }
+    }
+
     // 清空并渲染节点
     row.innerHTML = '';
     const nodes = [];
-    leftIdxs.sort((a,b) => a - b);
     leftIdxs.forEach((idx, pos) => {
         const st = lineInfo[idx];
         const isNext = false;

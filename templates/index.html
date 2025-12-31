@@ -224,7 +224,7 @@
                              {% if svc.is_loop %}
                                  {% if direction|int == 1 %}Inner Loop{% else %}Outer Loop{% endif %}
                              {% else %}
-                                 {{ trans_data.get(svc.start, svc.start).replace('<br>', ' ') }}
+                                 {{ trans_data.get(svc.start, svc.start or '').replace('<br>', ' ') if trans_data.get(svc.start, svc.start or '') else '' }}
                              {% endif %}
                          </div>
                      </div>
@@ -235,8 +235,8 @@
                          {% endfor %}
                      </div>
                      <div class="terminal-station">
-                         <div class="term-cn">{{ svc.end }}</div>
-                         <div class="term-en">{{ trans_data.get(svc.end, svc.end).replace('<br>', ' ') }}</div>
+                         <div class="term-cn">{{ svc.end or '' }}</div>
+                         <div class="term-en">{{ trans_data.get(svc.end, svc.end or '').replace('<br>', ' ') if trans_data.get(svc.end, svc.end or '') else '' }}</div>
                      </div>
                       {% endif %}
                  </div>

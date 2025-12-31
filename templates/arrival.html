@@ -5,10 +5,10 @@
 {% block header_subtitle %}
     {% if next_station_info and next_station_info.terminal_station %}
         终点站：<strong>{{ next_station_info.terminal_station }}</strong>
-        <div class="line-sub-info-en">Terminal: <strong>{{ trans_data.get(next_station_info.terminal_station, next_station_info.terminal_station).replace('<br>', ' ') }}</strong></div>
+        <div class="line-sub-info-en">Terminal: <strong>{{ trans_data.get(next_station_info.terminal_station, next_station_info.terminal_station or '').replace('<br>', ' ') if trans_data.get(next_station_info.terminal_station, next_station_info.terminal_station or '') else '' }}</strong></div>
     {% else %}
         终点站：<strong>{{ terminal_station or '未知' }}</strong>
-        <div class="line-sub-info-en">Terminal: <strong>{{ trans_data.get(terminal_station, terminal_station or 'Unknown').replace('<br>', ' ') }}</strong></div>
+        <div class="line-sub-info-en">Terminal: <strong>{{ trans_data.get(terminal_station, terminal_station or 'Unknown').replace('<br>', ' ') if trans_data.get(terminal_station, terminal_station or '') else '' }}</strong></div>
     {% endif %}
 {% endblock %}
 
@@ -42,7 +42,7 @@
             {% endif %}
         </div>
         <span class="arrival-station-name">{{ next_station }}</span>
-        <span class="arrival-station-name-en">{{ trans_data.get(next_station, next_station).replace('<br>', ' ') }}</span>
+        <span class="arrival-station-name-en">{{ trans_data.get(next_station, next_station or '').replace('<br>', ' ') if trans_data.get(next_station, next_station or '') else '' }}</span>
     </div>
 {% endblock %}
 

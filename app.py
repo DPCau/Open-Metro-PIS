@@ -89,6 +89,67 @@ def get_data_dir():
     """获取当前城市的数据目录"""
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data', get_current_city())
 
+def _pick_initial_next_station_for_switch(line_name, route_name, direction, line_info):
+    try:
+        if not line_info:
+            return ''
+        stations = [s.get('station_name') for s in line_info if isinstance(s, dict) and s.get('station_name')]
+        if not stations:
+            return ''
+
+        dir_val = 0
+        try:
+            dir_val = int(direction or 0)
+        except Exception:
+            dir_val = 0
+
+        route_data = _get_route_data()
+        line_cfg = route_data.get(line_name, {}) if isinstance(route_data, dict) else {}
+        is_loop = (line_cfg.get('type') == 'loop') if isinstance(line_cfg, dict) else False
+
+        terminal = ''
+        if is_loop:
+            for svc in (line_cfg.get('services', []) or []):
+                name = svc.get('type') or svc.get('service_name')
+                if name == route_name:
+                    terminal = (svc.get('terminal_station') or '').strip()
+                    break
+
+        if not is_loop:
+            return stations[-1] if dir_val == 1 else stations[0]
+
+        if is_loop and terminal:
+            stations_dir = list(reversed(stations)) if dir_val == 1 else stations
+            if terminal in stations_dir:
+                n = len(stations_dir)
+                if n >= 2:
+                    term_idx = stations_dir.index(terminal)
+                    return stations_dir[(term_idx + 1) % n]
+        else:
+            station_data = _get_station_data()
+            code = None
+            if tools is not None:
+                try:
+                    code = tools._line_code_from_key(line_name)
+                except Exception:
+                    code = None
+            if code is None:
+                code = _line_code_from_key(line_name)
+            if code:
+                for name in stations:
+                    codes = station_data.get(name) if isinstance(station_data, dict) else None
+                    if not isinstance(codes, list):
+                        continue
+                    for c in codes:
+                        if not (isinstance(c, list) and len(c) >= 2):
+                            continue
+                        if str(c[0]).strip() == str(code).strip() and str(c[1]).strip() == '01':
+                            return name
+
+        return stations[0]
+    except Exception:
+        return ''
+
 def load_app_config():
     """加载应用配置文件"""
     config_path = os.path.join(get_data_dir(), 'config.json')
@@ -252,11 +313,7 @@ def reverse_direction():
         line_info = fallback_get_line_map_info(line_name, route_name)
         
     if line_info:
-        # 如果是反向，第一站是原始列表的最后一站
-        if direction == 1:
-            current_state['next_station'] = line_info[-1]['station_name']
-        else:
-            current_state['next_station'] = line_info[0]['station_name']
+        current_state['next_station'] = _pick_initial_next_station_for_switch(line_name, route_name, direction, line_info)
             
     save_current_state(current_state)
     return jsonify(current_state)
@@ -298,10 +355,7 @@ def next_route():
                 line_info = fallback_get_line_map_info(line_name, new_route)
                 
             if line_info:
-                if direction == 1:
-                    current_state['next_station'] = line_info[-1]['station_name']
-                else:
-                    current_state['next_station'] = line_info[0]['station_name']
+                current_state['next_station'] = _pick_initial_next_station_for_switch(line_name, new_route, direction, line_info)
                     
             save_current_state(current_state)
             return jsonify(current_state)
@@ -344,10 +398,7 @@ def next_line():
             
             direction = current_state.get('direction', 0)
             if line_info:
-                if direction == 1:
-                    new_station = line_info[-1]['station_name']
-                else:
-                    new_station = line_info[0]['station_name']
+                new_station = _pick_initial_next_station_for_switch(new_line, new_route, direction, line_info)
             else:
                 new_station = ''
             
@@ -395,10 +446,7 @@ def prev_line():
             
             direction = current_state.get('direction', 0)
             if line_info:
-                if direction == 1:
-                    new_station = line_info[-1]['station_name']
-                else:
-                    new_station = line_info[0]['station_name']
+                new_station = _pick_initial_next_station_for_switch(new_line, new_route, direction, line_info)
             else:
                 new_station = ''
             
@@ -528,10 +576,7 @@ def prev_route():
                 line_info = fallback_get_line_map_info(line_name, new_route)
                 
             if line_info:
-                if direction == 1:
-                    current_state['next_station'] = line_info[-1]['station_name']
-                else:
-                    current_state['next_station'] = line_info[0]['station_name']
+                current_state['next_station'] = _pick_initial_next_station_for_switch(line_name, new_route, direction, line_info)
                     
             save_current_state(current_state)
             return jsonify(current_state)
@@ -618,8 +663,8 @@ def index():
     header_text_color, is_light_theme = get_header_theme(line_color)
 
     # 根据direction计算两端站名用于展示（右侧为终点站）
-    terminal_station = None
-    start_station = None
+    terminal_station = ""
+    start_station = ""
     try:
         line_name = current_state['line_name']
         route_name = current_state['route_name']

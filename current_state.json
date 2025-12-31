@@ -1,7 +1,7 @@
 {
-    "line_name": "line_环",
-    "route_name": "route1",
-    "next_station": "重庆西站",
+    "line_name": "line_7",
+    "route_name": "route2",
+    "next_station": "理工大学",
     "direction": 0,
     "door_side": "本侧",
     "current_carriage": 3
