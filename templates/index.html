@@ -197,12 +197,298 @@
     }
     .terminal-info-en { text-align: right; margin-top: 6px; font-size: 14px; color: #666; }
     .terminal-info-en strong { color: #9b5de5; font-size: 16px; }
+
+    .route-info-detail {
+        margin: 30px 0;
+    }
+    .detail-grid {
+        display: grid;
+        grid-template-columns: var(--label-col, 96px) repeat(var(--station-count, 1), minmax(0, 1fr));
+        align-items: center;
+    }
+    .detail-header {
+        align-items: end;
+        margin-bottom: 18px;
+    }
+    .detail-station-cell {
+        position: relative;
+        height: 108px;
+        overflow: visible;
+    }
+    .detail-station-label {
+        position: absolute;
+        left: 50%;
+        bottom: -11px;
+        transform: rotate(var(--label-rotate, -55deg)) scale(var(--label-scale, 1));
+        transform-origin: bottom left;
+        text-align: left;
+        white-space: nowrap;
+        pointer-events: none;
+        user-select: none;
+        max-width: var(--label-max-width, 180px);
+        overflow: hidden;
+    }
+    .detail-station-cn {
+        font-size: 12px;
+        color: #333;
+        line-height: 1.1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .detail-station-en {
+        font-size: 10px;
+        color: #666;
+        line-height: 1.1;
+        margin-top: 2px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .detail-row {
+        margin: 10px 0;
+    }
+    .detail-row-label {
+        font-size: 14px;
+        color: #666;
+        justify-self: start;
+        white-space: nowrap;
+    }
+    .detail-branch-names {
+        margin: 2px 0 0;
+    }
+    .detail-branch-name {
+        font-size: 10px;
+        color: #666;
+        text-align: center;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        padding: 0 2px;
+    }
+    .detail-cell {
+        position: relative;
+        height: 22px;
+        overflow: visible;
+    }
+    .detail-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background-color: var(--row-color, #cfcfcf);
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 2px var(--row-color, #cfcfcf) inset;
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 2;
+        box-sizing: border-box;
+    }
+    .detail-connector {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: calc(var(--span, 1) * 100%);
+        height: 8px;
+        transform: translateY(-50%);
+        background-color: var(--row-color, #cfcfcf);
+        border-radius: 6px;
+        z-index: 1;
+    }
+
+    /* 环线圆环动画样式 */
+    .loop-visual-container {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 160px;
+        gap: 30px;
+        margin: 20px 0;
+    }
+    .loop-ring-wrapper {
+        position: relative;
+        width: 150px;
+        height: 150px;
+    }
+    .loop-svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+    .spin-cw { animation: spin 6s linear infinite; }
+    .spin-ccw { animation: spin 6s linear infinite reverse; }
+    
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    .loop-center-text {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 26px;
+        font-weight: bold;
+        color: var(--theme-color);
+        white-space: nowrap;
+    }
+    .loop-terminal-arrow {
+        font-size: 50px;
+        color: var(--theme-color);
+        font-weight: bold;
+        margin-top: -8px;
+        line-height: 1;
+    }
+    .loop-terminal-text {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        text-align: left;
+    }
+    .loop-terminal-text .term-cn {
+        font-size: 32px;
+        font-weight: bold;
+        color: #333;
+        line-height: 1.2;
+    }
+    .loop-terminal-text .term-en {
+        font-size: 18px;
+        color: #666;
+        line-height: 1.2;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
+    <!-- 注入分支判断标记 -->
+    {% set has_branches = route_services|selectattr('branch')|list|length > 0 %}
+    <div id="has-branches" data-value="{{ 'true' if has_branches else 'false' }}" style="display:none;"></div>
+
     <!-- 路线信息展示（nextstation功能） -->
-    <div class="route-info" style="--theme-color: {{ line_color or '#9b5de5' }};">
+    {% if run_style == 'detail' and route_services %}
+    {% set sc = (base_stations|length if base_stations is defined else 0) %}
+    <div class="route-info route-info-detail" style="--theme-color: {{ line_color or '#9b5de5' }};">
+        {% set ns = namespace(active_group='0') %}
+        {% for svc in route_services %}
+            {% if svc.is_main %}
+                {% set ns.active_group = svc.group %}
+            {% endif %}
+        {% endfor %}
+        {% set route_services_display = route_services | selectattr('group', 'equalto', ns.active_group) | list %}
+        {% if route_services_display|length == 0 %}
+            {% set route_services_display = route_services %}
+        {% endif %}
+        {% set loop_count = route_services_display|selectattr('is_loop')|list|length %}
+        {% set is_loop_group = (route_services_display|length > 0 and loop_count == route_services_display|length) %}
+        {% set ns2 = namespace(base=None, base_len=0) %}
+        {% for svc in route_services_display %}
+            {% if (svc.stations or [])|length > ns2.base_len %}
+                {% set ns2.base = svc %}
+                {% set ns2.base_len = (svc.stations or [])|length %}
+            {% endif %}
+            {% if svc.branch %}
+                {% for p in route_services %}
+                    {% if p.name == svc.branch and (p.stations or [])|length > ns2.base_len %}
+                        {% set ns2.base = p %}
+                        {% set ns2.base_len = (p.stations or [])|length %}
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        {% endfor %}
+        {% set base_stations = (ns2.base.stations if ns2.base else route_services_display[0].stations) %}
+        {% set sc = base_stations|length %}
+        {% set label_scale = 1 %}
+        {% set label_max_width = 180 %}
+        {% set label_col = 96 %}
+        {% set label_rotate = '-55deg' %}
+        {% if sc > 44 %}
+            {% set label_scale = 0.62 %}
+            {% set label_max_width = 120 %}
+            {% set label_col = 70 %}
+            {% set label_rotate = '-42deg' %}
+        {% elif sc > 38 %}
+            {% set label_scale = 0.72 %}
+            {% set label_max_width = 140 %}
+            {% set label_col = 78 %}
+            {% set label_rotate = '-48deg' %}
+        {% elif sc > 32 %}
+            {% set label_scale = 0.82 %}
+            {% set label_max_width = 160 %}
+            {% set label_col = 86 %}
+            {% set label_rotate = '-52deg' %}
+        {% endif %}
+        {% if not is_loop_group %}
+        <div class="detail-grid detail-header" style="--station-count: {{ sc }}; --label-scale: {{ label_scale }}; --label-rotate: {{ label_rotate }}; --label-max-width: {{ label_max_width }}px; --label-col: {{ label_col }}px;">
+            <div></div>
+            {% for st in base_stations %}
+                <div class="detail-station-cell">
+                    <div class="detail-station-label">
+                        <div class="detail-station-cn">{{ st }}</div>
+                        <div class="detail-station-en">{{ (trans_data.get(st, '') or '') | safe }}</div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% for svc in route_services_display %}
+            {% if svc.is_loop %}
+                <div class="loop-visual-container">
+                    <div class="loop-ring-wrapper">
+                         <svg viewBox="0 0 100 100" class="loop-svg {{ 'spin-cw' if direction|int == 1 else 'spin-ccw' }}">
+                             <defs>
+                                <marker id="arrowhead" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto">
+                                    <path d="M 0 0 L 10 5 L 0 10 L 2 5 z" fill="{{ line_color or '#9b5de5' }}" />
+                                </marker>
+                             </defs>
+                             {% if direction|int == 1 %}
+                                 <!-- 内环 (顺时针旋转): 箭头顺时针指向 -->
+                                 <!-- 上半圆弧 (Left->Top->Right) -->
+                                 <path d="M 14.3 37.0 A 38 38 0 0 1 85.7 37.0" fill="none" stroke="{{ line_color or '#9b5de5' }}" stroke-width="5" stroke-linecap="round" marker-end="url(#arrowhead)" />
+                                 <!-- 下半圆弧 (Right->Bottom->Left) -->
+                                 <path d="M 85.7 63.0 A 38 38 0 0 1 14.3 63.0" fill="none" stroke="{{ line_color or '#9b5de5' }}" stroke-width="5" stroke-linecap="round" marker-end="url(#arrowhead)" />
+                             {% else %}
+                                 <!-- 外环 (逆时针旋转): 箭头逆时针指向 -->
+                                 <!-- 上半圆弧 (Right->Top->Left) -->
+                                 <path d="M 85.7 37.0 A 38 38 0 0 0 14.3 37.0" fill="none" stroke="{{ line_color or '#9b5de5' }}" stroke-width="5" stroke-linecap="round" marker-end="url(#arrowhead)" />
+                                 <!-- 下半圆弧 (Left->Bottom->Right) -->
+                                 <path d="M 14.3 63.0 A 38 38 0 0 0 85.7 63.0" fill="none" stroke="{{ line_color or '#9b5de5' }}" stroke-width="5" stroke-linecap="round" marker-end="url(#arrowhead)" />
+                             {% endif %}
+                         </svg>
+                         <div class="loop-center-text">
+                             {{ '内环' if direction|int == 1 else '外环' }}
+                         </div>
+                    </div>
+                    {% if svc.has_terminal %}
+                        <div class="loop-terminal-arrow">→</div>
+                        <div class="loop-terminal-text">
+                            <div class="term-cn">{{ svc.end }}</div>
+                            <div class="term-en">{{ trans_data.get(svc.end, svc.end or '').replace('<br>', ' ') }}</div>
+                        </div>
+                    {% endif %}
+                </div>
+            {% else %}
+            <div class="detail-grid detail-row" style="--station-count: {{ sc }}; --row-color: {{ (line_color or '#9b5de5') if svc.is_main else '#cfcfcf' }};">
+                <div class="detail-row-label">{% if svc.label %}{{ svc.label }}{% else %}运营线路{% if route_services_display|length > 1 %}{{ loop.index }}{% endif %}{% endif %}</div>
+                {% for st in base_stations %}
+                    {% set present = st in (svc.stations or []) %}
+                    <div class="detail-cell">
+                        {% if present %}
+                            <div class="detail-dot"></div>
+                            {% set nsc = namespace(span=0) %}
+                            {% for st2 in base_stations[loop.index0 + 1:] %}
+                                {% if nsc.span == 0 and (st2 in (svc.stations or [])) %}
+                                    {% set nsc.span = loop.index %}
+                                {% endif %}
+                            {% endfor %}
+                            {% if nsc.span > 0 %}
+                                <div class="detail-connector" style="--span: {{ nsc.span }};"></div>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="route-info route-info-default" style="--theme-color: {{ line_color or '#9b5de5' }};">
         {% if route_services %}
             {% set ns = namespace(active_group='0') %}
             {% for svc in route_services %}
@@ -216,7 +502,7 @@
             {% endif %}
             {% set has_multiple = route_services_display|length > 1 %}
             {% for svc in route_services_display %}
-                <div class="route-label {{ 'active' if svc.is_main else '' }}">运营线路{% if has_multiple %}{{ loop.index }}{% endif %}</div>
+                <div class="route-label {{ 'active' if svc.is_main else '' }}">{% if svc.label %}{{ svc.label }}{% else %}运营线路{% if has_multiple %}{{ loop.index }}{% endif %}{% endif %}</div>
                 <div class="route-line {{ 'active' if svc.is_main else '' }} {{ 'loop' if svc.is_loop else '' }} {{ 'single' if svc.is_loop and not svc.has_terminal else '' }}" data-total="{{ svc.total }}" data-stations="{{ (svc.stations or []) | join('|') }}" data-next="{{ next_station }}" data-direction="{{ direction }}" data-terminal="{{ svc.end if svc.is_loop else terminal_station }}" data-is-loop="{{ 1 if svc.is_loop else 0 }}" data-has-terminal="{{ 1 if svc.has_terminal else 0 }}">
                      <div class="terminal-station">
                          <div class="term-cn">{{ svc.start }}</div>
@@ -242,7 +528,6 @@
                  </div>
             {% endfor %}
         {% else %}
-            <!-- 回退：仅渲染主运营线路 -->
             <div class="route-label active">运营线路</div>
             <div class="route-line active">
                 <div class="terminal-station">{% if start_station %}{{ start_station }}{% endif %}</div>
@@ -255,6 +540,7 @@
             </div>
         {% endif %}
     </div>
+    {% endif %}
     
     <div class="terminal-info">
         {% if route_services and route_services[0].is_loop %}
@@ -288,17 +574,17 @@
         console.log('PIS车内导视系统首页加载完成');
         
         // 路线信息布局功能（nextstation功能）
-        const routeInfo = document.querySelector('.route-info');
+        const routeInfo = document.querySelector('.route-info-default');
         if (routeInfo) {
             const theme = routeInfo?.style.getPropertyValue('--theme-color') || '#9b5de5';
             // 统一主题色描边
-            document.querySelectorAll('.station-indicator').forEach(el => {
+            routeInfo.querySelectorAll('.station-indicator').forEach(el => {
                 el.style.borderColor = theme;
                 el.style.boxShadow = '0 0 0 2px rgba(255,255,255,0.8) inset';
             });
             
             function layoutRouteLines() {
-                const routeLines = Array.from(document.querySelectorAll('.route-line'));
+                const routeLines = Array.from(routeInfo.querySelectorAll('.route-line'));
                 
                 function computeEffectiveTotal(line) {
                     const isLoop = (line.getAttribute('data-is-loop') || '0') === '1';
@@ -494,7 +780,7 @@
             layoutRouteLines();
  
             // 红点依次显示：让"下一站"红点在运营线路上顺序移动（只显示next，不显示active红点）
-            const activeLine = document.querySelector('.route-line.active .station-indicators');
+            const activeLine = routeInfo.querySelector('.route-line.active .station-indicators');
             if (activeLine) {
                 const indicators = Array.from(activeLine.querySelectorAll('.station-indicator'));
                 let cursor = 0;

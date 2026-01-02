@@ -39,6 +39,7 @@ Mirror address in China Mainland (synchronized every 8 hours): [Gitea Mirror](ht
 
 ## Update Notes
 
+- 2026-01-02 Added `detail` mode for route preview (for loop lines, express lines, etc.), and added some depot return routes.
 - 2025-12-31 Fixed loop line discontinuity issues in the detail page, and filled with passed stations when the number of stations is insufficient
 - 2025-12-28 Fixed CRT Direct Express train issues, added Line 4 depot return route
 - 2025-12-26 Added Rong Line 2 content, improved branch line detection
@@ -100,15 +101,37 @@ This project implements an in-carriage Passenger Information System (PIS) based 
   
     ![image-20251225131806295](./assets/image-20251225131806295.png)
   
+  - Detailed Mode
+    
+    ![image-20260102202741392](./assets/image-20260102202741392.png)
+  
   - Inner Loop
+  
+    - Normal Mode
   
     ![image-20251225131818098](./assets/image-20251225131818098.png)
   
-  - With Terminal
+    - Detailed Mode
 
+    ![image-20260102202758807](./assets/image-20260102202758807.png)
+  
+  - With Terminal
+  
     To Cuijiadian
     
+    - Normal Mode
+
     ![image-20251225131833878](./assets/image-20251225131833878.png)
+
+    - Detailed Mode
+    
+    ![image-20260102202836162](./assets/image-20260102202836162.png)
+
+- Lines with Express/Direct Service
+
+![image-20260102203016708](./assets/image-20260102203016708.png)
+
+![image-20260102203029812](./assets/image-20260102203029812.png)
 
 
 2. Line Map Display
@@ -331,6 +354,7 @@ Determines the displayed names, years, etc., on the tabs.
 
 Field Descriptions:
 - line_name: Name of the line.
+- run_style: Display style for the operating route; `default` for standard mode, `detail` for detailed mode.
 - type: Line type; `linear` for normal lines, `loop` for loop lines.
 - layout: Line layout; `auto` for automatic, `two_line` for two-line, `one_line` for single-line. **Loop lines do not support `one_line` layout.**
 - detail_style: Station detail display style; `default` or `column`.
@@ -338,6 +362,7 @@ Field Descriptions:
 - services
   - type: Service/Route.
   - stations: Ordered list of stations.
+  - label: Service name, displayed on the operating route.
   - terminal_station: Terminal station, only required for loop lines.
   - branch: The route from which this branch inherits.
   - group: The group it belongs to, determining the operating route display.

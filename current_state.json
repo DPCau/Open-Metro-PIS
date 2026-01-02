@@ -1,8 +1,8 @@
 {
-    "line_name": "line_7",
-    "route_name": "route2",
-    "next_station": "理工大学",
-    "direction": 0,
+    "line_name": "line_19",
+    "route_name": "route3",
+    "next_station": "天府机场1号2号航站楼",
+    "direction": 1,
     "door_side": "本侧",
     "current_carriage": 3
 }

@@ -209,6 +209,8 @@ document.addEventListener('keydown', function(event) {
         // i 键 -> 单行模式 (仅在页面2/线路图生效)
         if (window.location.pathname === '/line_map') {
             updateLayout('one_line');
+        } else if (window.location.pathname === '/') {
+            updateRunStyle('default');
         } else if (window.location.pathname === '/line_detail') {
             updateDetailStyle('default');
         }
@@ -216,6 +218,17 @@ document.addEventListener('keydown', function(event) {
         // o 键 -> 双行模式 (仅在页面2/线路图生效)
         if (window.location.pathname === '/line_map') {
             updateLayout('two_line');
+        } else if (window.location.pathname === '/') {
+            // 检查是否存在分支
+            const hasBranchesEl = document.getElementById('has-branches');
+            const hasBranches = hasBranchesEl && hasBranchesEl.getAttribute('data-value') === 'true';
+            
+            if (hasBranches) {
+                // 如果有分支，按o强制使用default模式
+                updateRunStyle('default');
+            } else {
+                updateRunStyle('detail');
+            }
         } else if (window.location.pathname === '/line_detail') {
             updateDetailStyle('column');
         }
@@ -261,6 +274,23 @@ function updateDetailStyle(style) {
         }
     })
     .catch(err => console.error('请求更新详情样式失败:', err));
+}
+
+function updateRunStyle(style) {
+    fetch('/api/state/run_style', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ style: style })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            window.location.reload();
+        } else {
+            console.error('更新首页样式失败:', data.message);
+        }
+    })
+    .catch(err => console.error('请求更新首页样式失败:', err));
 }
 
 // 格式化站点索引信息

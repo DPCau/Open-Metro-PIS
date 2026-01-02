@@ -540,6 +540,45 @@ def update_detail_style():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/api/state/run_style', methods=['POST'])
+def update_run_style():
+    global current_state
+    style = (request.json or {}).get('style')
+    if style not in ['default', 'detail']:
+        return jsonify({'status': 'error', 'message': '无效的首页样式'}), 400
+
+    line_name = current_state['line_name']
+    data_dir = get_data_dir()
+    route_file = os.path.join(data_dir, 'route.json')
+
+    try:
+        with open(route_file, 'r', encoding='utf-8') as f:
+            route_data = json.load(f)
+
+        if line_name not in route_data:
+            return jsonify({'status': 'error', 'message': '未找到线路'}), 404
+
+        line_cfg = route_data.get(line_name, {})
+        if not isinstance(line_cfg, dict):
+            line_cfg = {}
+        line_cfg['run_style'] = style
+        route_data[line_name] = line_cfg
+
+        save_json_file(route_file, route_data)
+
+        if 'route.json' in _DATA_CACHE:
+            del _DATA_CACHE['route.json']
+
+        if tools is not None:
+            try:
+                tools._load_data()
+            except Exception as e:
+                print(f"重载 RouteTools 数据失败: {e}")
+
+        return jsonify({'status': 'success', 'run_style': style})
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/api/state/route/prev', methods=['POST'])
 def prev_route():
     """切换到上一个路由 (上方向键)"""
@@ -815,6 +854,8 @@ def index():
         main_has_terminal = bool((main_terminal_field or '').strip())
         route_services.append({
             'name': route_name,
+            'label': (main_raw or {}).get('label'),
+            'branch': (main_raw or {}).get('branch'),
             'group': main_group,
             'is_main': True,
             'is_loop': (line_type == 'loop'),
@@ -853,6 +894,8 @@ def index():
                 has_terminal = bool((terminal_field or '').strip())
                 route_services.append({
                     'name': r,
+                    'label': (raw or {}).get('label'),
+                    'branch': (raw or {}).get('branch'),
                     'group': other_group,
                     'is_main': False,
                     'is_loop': (line_type == 'loop'),
@@ -920,6 +963,34 @@ def index():
                 line_en_name = fallback_get_line_en_name(ln)
     except Exception:
         pass
+
+    run_style = 'default'
+    try:
+        line_name = current_state.get('line_name')
+        if line_name:
+            data_dir = get_data_dir()
+            route_file = os.path.join(data_dir, 'route.json')
+            with open(route_file, 'r', encoding='utf-8') as f:
+                route_data_raw = json.load(f)
+            line_cfg = route_data_raw.get(line_name, {})
+            if not isinstance(line_cfg, dict):
+                line_cfg = {}
+            if 'run_style' not in line_cfg:
+                line_cfg['run_style'] = 'default'
+                route_data_raw[line_name] = line_cfg
+                save_json_file(route_file, route_data_raw)
+                if 'route.json' in _DATA_CACHE:
+                    del _DATA_CACHE['route.json']
+                if tools is not None:
+                    try:
+                        tools._load_data()
+                    except Exception as e:
+                        print(f"重载 RouteTools 数据失败: {e}")
+            run_style = (line_cfg.get('run_style') or 'default')
+            if run_style not in ['default', 'detail']:
+                run_style = 'default'
+    except Exception:
+        run_style = 'default'
     
     return render_template('index.html',
                            line_color=line_color,
@@ -933,6 +1004,7 @@ def index():
                            loop_ring_label_main=loop_ring_label_main,
                            loop_terminal_main=loop_terminal_main,
                            trans_data=trans_data,
+                           run_style=run_style,
                            config=app_config,
                            **current_state)
 
