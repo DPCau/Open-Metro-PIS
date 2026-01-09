@@ -372,17 +372,30 @@
         z-index: 3;
     }
     .transfer-badge {
-        width: calc(22px * var(--map-scale));
-        height: calc(22px * var(--map-scale));
+        width: 22px;
+        height: 22px;
         border-radius: 50%;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        font-size: calc(12px * var(--map-scale));
+        font-size: 12px;
         color: white;
         font-weight: bold;
     }
     .transfer-badge.wide {
+        width: auto;
+        min-width: 22px;
+        padding: 0 5px;
+        border-radius: 11px;
+    }
+
+    /* 地图上的徽章使用缩放尺寸 */
+    .transfer-badges .transfer-badge {
+        width: calc(22px * var(--map-scale));
+        height: calc(22px * var(--map-scale));
+        font-size: calc(12px * var(--map-scale));
+    }
+    .transfer-badges .transfer-badge.wide {
         width: auto;
         min-width: calc(22px * var(--map-scale));
         padding: 0 calc(5px * var(--map-scale));
@@ -708,6 +721,8 @@ function createZigzagLayout() {
                 rowBranch.dataset.startIndex = String(forkIndexOrig + 1);
                 rowBranch.dataset.endIndex = String(forkIndexOrig + 1 + branchStationObjs.length - 1);
                 
+                rowBranch.dataset.branchMode = 'branch';
+                
                 // 检查分支是否激活
                 const isBranchActive = branchStationObjs.some(s => currentRouteSet.has(s.station_name));
                 if (!isBranchActive) {
@@ -722,32 +737,12 @@ function createZigzagLayout() {
                          // Color from Next -> End.
                          const startIdx = branchNextIndex;
                          const endIdx = branchStationObjs.length - 1;
-                         
-                         // Mark passed stations in branch row (0..Next-1)
-                         // Wait, we need to apply this AFTER adding to DOM? No, stations are not in DOM yet?
-                         // Ah, logic below handles creation.
-                         // We need to inject "passed" class into createStationNode or post-process.
-                         // Let's use post-process.
-                         
-                         // We'll add a data attribute to rowBranch to help computeRailAndConnectors logic?
-                         // Or we can just let standard logic handle it?
-                         // Standard logic: "if (globalNextIndex >= rowStart ...)"
-                         // But rowStart is just index offset.
-                         // Our branch row stations are not contiguous in lineInfo?
-                         // Actually they are mocked objects or real objects.
-                         // Standard logic relies on "row.dataset.startIndex".
-                         // In Branch Mode, we set startIndex/endIndex manually.
-                         // But `globalNextIndex` is based on `lineInfo` index.
-                         // If Branch Stations are NOT in `lineInfo` (or index mismatch), standard logic fails.
-                         // So we should implement Custom Coloring for Branch Row too, inside computeRailAndConnectors.
-                         rowBranch.dataset.branchMode = 'branch';
                     } else {
                          // Next station NOT in Branch Row.
                          // If Next is in Main Row (before Fork), then Branch Row is FUTURE.
                          // So Color Start -> End.
                          // Check if Next is in Main Row (before Fork).
                          // We can assume if Branch is Active, and Next is not in Branch, it's upstream.
-                         rowBranch.dataset.branchMode = 'branch';
                     }
                 }
                 
@@ -757,56 +752,6 @@ function createZigzagLayout() {
                 // Post-process "passed" status for branch stations if needed (initial render)
                 // Actually computeRailAndConnectors is called on init/resize.
                 // So we should put logic there.
-                
-                requestAnimationFrame(() => {
-                    const forkStation = rowMain.children[forkIndex];
-                    const branchStartStation = rowBranch.children[0];
-                    if (forkStation && branchStartStation) {
-                        const rect1 = forkStation.getBoundingClientRect();
-                        const rect2 = branchStartStation.getBoundingClientRect();
-                        const containerRect = metroLine.getBoundingClientRect();
-                        
-                        const offsetY = (direction === 1) ? -10 : 0;
-                        const x1 = rect1.left + rect1.width / 2 - containerRect.left;
-                        const y1 = rect1.top + rect1.height / 2 - containerRect.top + offsetY;
-                        const x2 = rect2.left + rect2.width / 2 - containerRect.left;
-                        const y2 = rect2.top + rect2.height / 2 - containerRect.top + offsetY;
-                        
-                        const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-                        const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
-                        
-                        const connector = document.createElement('div');
-                        connector.className = 'branch-connector';
-                        connector.style.position = 'absolute';
-                        connector.style.top = y1 + 'px';
-                        connector.style.left = x1 + 'px';
-                        connector.style.width = length + 'px';
-                        connector.style.height = '15px';
-                        connector.style.transformOrigin = '0 50%';
-                        connector.style.transform = `rotate(${angle}deg) translateY(-50%)`;
-                        connector.style.borderRadius = '8px';
-                        connector.style.zIndex = '0';
-                        
-                        const themeColor = getComputedStyle(metroLine).getPropertyValue('--theme-color').trim() || '#9b5de5';
-                        const isPassed = branchStartStation.querySelector('.station-circle').classList.contains('passed');
-                        const branchStationsNow = Array.from(rowBranch.querySelectorAll('.station-node'));
-                        const branchStartName = branchStationsNow[0].querySelector('.station-name').textContent;
-                        const nextInBranchIdx = branchStationsNow.findIndex(s => s.querySelector('.station-name').textContent === nextStationName);
-                        
-                        let toColor = false;
-                        if (fullRouteMode && !currentRouteSet.has(branchStartName)) {
-                            toColor = false;
-                        } else if (nextInBranchIdx >= 0) {
-                            const direction = parseInt(document.getElementById('direction-data')?.textContent || '0');
-                            toColor = (direction === 1);
-                        } else if (isBranchActive && !isPassed) {
-                            toColor = true;
-                        }
-                        connector.style.backgroundColor = toColor ? themeColor : '#ddd';
-                        
-                        metroLine.appendChild(connector);
-                    }
-                });
                 
                 return;
             }
@@ -1768,6 +1713,93 @@ function computeRailAndConnectors() {
     }
 }
 
+function computeBranchConnectors() {
+    const metroLine = document.getElementById('metro-line');
+    if (!metroLine) return;
+
+    // 清除现有连接线
+    metroLine.querySelectorAll('.branch-connector').forEach(el => el.remove());
+
+    const rows = Array.from(metroLine.querySelectorAll('.line-row'));
+    const rowMain = rows.find(r => r.dataset.branchMode === 'main');
+    const rowBranch = rows.find(r => r.dataset.branchMode === 'branch');
+    
+    // 如果找不到对应的行，直接返回
+    if (!rowMain || !rowBranch) return;
+
+    const forkIndex = parseInt(rowMain.dataset.forkIndex || '-1', 10);
+    if (!(forkIndex >= 0)) return;
+
+    // 使用 querySelectorAll 确保选中的是站点节点，不受其他子元素（如箭头）影响
+    const mainStations = rowMain.querySelectorAll('.station-node');
+    const branchStations = rowBranch.querySelectorAll('.station-node');
+    
+    const forkStation = mainStations[forkIndex];
+    const branchStartStation = branchStations[0];
+    
+    if (!forkStation || !branchStartStation) return;
+
+    const rect1 = forkStation.getBoundingClientRect();
+    const rect2 = branchStartStation.getBoundingClientRect();
+    const containerRect = metroLine.getBoundingClientRect();
+
+    // 如果宽度为0，说明布局尚未完成，由于是同步调用，我们可能需要等待下一帧
+    if (rect1.width === 0 || rect2.width === 0 || containerRect.width === 0) {
+        // 如果是初次尝试且没有标志位，则尝试在下一帧重新计算
+        if (!window._branchConnectorRetry) {
+            window._branchConnectorRetry = true;
+            requestAnimationFrame(() => {
+                computeBranchConnectors();
+                window._branchConnectorRetry = false;
+            });
+        }
+        return;
+    }
+
+    const direction = parseInt(document.getElementById('direction-data')?.textContent || '0', 10);
+    const offsetY = (direction === 1) ? -10 : 0;
+    
+    const x1 = rect1.left + rect1.width / 2 - containerRect.left;
+    const y1 = rect1.top + rect1.height / 2 - containerRect.top + offsetY;
+    const x2 = rect2.left + rect2.width / 2 - containerRect.left;
+    const y2 = rect2.top + rect2.height / 2 - containerRect.top + offsetY;
+
+    const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+    const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+
+    const connector = document.createElement('div');
+    connector.className = 'branch-connector';
+    connector.style.position = 'absolute';
+    connector.style.top = y1 + 'px';
+    connector.style.left = x1 + 'px';
+    connector.style.width = length + 'px';
+    connector.style.height = '15px';
+    connector.style.transformOrigin = '0 50%';
+    connector.style.transform = `rotate(${angle}deg) translateY(-50%)`;
+    connector.style.borderRadius = '8px';
+    connector.style.zIndex = '0';
+
+    const themeColor = getComputedStyle(metroLine).getPropertyValue('--theme-color').trim() || '#9b5de5';
+    const isPassed = !!branchStartStation.querySelector('.station-circle')?.classList.contains('passed');
+    
+    const branchStartName = branchStations[0].querySelector('.station-name')?.textContent || '';
+    const nextStationNameVal = JSON.parse(document.getElementById('next-station-data')?.textContent || 'null');
+    const nextInBranchIdx = Array.from(branchStations).findIndex(s => (s.querySelector('.station-name')?.textContent || '') === nextStationNameVal);
+    const isBranchActive = !rowBranch.classList.contains('inactive-row');
+
+    let toColor = false;
+    if (fullRouteMode && branchStartName && !currentRouteSet.has(branchStartName)) {
+        toColor = false;
+    } else if (nextInBranchIdx >= 0) {
+        toColor = (direction === 1);
+    } else if (isBranchActive && !isPassed) {
+        toColor = true;
+    }
+    connector.style.backgroundColor = toColor ? themeColor : '#ddd';
+
+    metroLine.appendChild(connector);
+}
+
 
 // 设定徽章背景色
     function setTransferBadgeColors() {
@@ -1840,6 +1872,7 @@ function handleResize() {
         createZigzagLayout();
         applyCustomLayoutStyles();
         computeRailAndConnectors();
+        computeBranchConnectors();
         setTransferBadgeColors();
         createTransferRings();
     }
@@ -1855,6 +1888,7 @@ function init() {
         createZigzagLayout();
         applyCustomLayoutStyles();
         computeRailAndConnectors();
+        computeBranchConnectors();
         setTransferBadgeColors();
         createTransferRings();
         // 注释掉自动滚动到下一站，让页面保持在最上方
@@ -1869,6 +1903,7 @@ function init() {
                     createZigzagLayout();
                     applyCustomLayoutStyles();
                     computeRailAndConnectors();
+                    computeBranchConnectors();
                     setTransferBadgeColors();
                     createTransferRings();
                 }, 60);

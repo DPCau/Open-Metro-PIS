@@ -39,14 +39,15 @@ Mirror address in China Mainland (synchronized every 8 hours): [Gitea Mirror](ht
 
 ## Update Notes
 
+- 2026-01-09 Fixed some line information, added advanced settings, and added configuration options for FPS and window size.
 - 2026-01-02 Added `detail` mode for route preview (for loop lines, express lines, etc.), and added some depot return routes.
 - 2025-12-31 Fixed loop line discontinuity issues in the detail page, and filled with passed stations when the number of stations is insufficient
-- 2025-12-28 Fixed CRT Direct Express train issues, added Line 4 depot return route
-- 2025-12-26 Added Rong Line 2 content, improved branch line detection
 
 <details>
 <summary>Click to expand/collapse update history</summary>
 
+- 2025-12-28 Fixed CRT Direct Express train issues, added Line 4 depot return route
+- 2025-12-26 Added Rong Line 2 content, improved branch line detection
 - 2025-12-25 Added arrival station page, bound new key operations, fixed loop line issues, added arrival page, added new display mode for detail page, added deployment watermark for anti-theft demo, adapted for mobile.
 - 2025-12-24 Added key operation mode, synchronized with overall theme color.
 - 2025-12-23 Fixed fork reverse direction issues, added two_line mode for loop lines.
@@ -314,6 +315,7 @@ Visit http://localhost:8089 in your browser.
 - Use `F` key to switch to the next station without refreshing the current page (so the next page switch shows the updated station).
 - Use `R` key to toggle direction.
 - Use `T` key to toggle door opening side.
+- On the Line Preview page (key `1`), use `I`, `O` to switch between Default and Detailed modes.
 - On the Line Map page (key `2`), use `I`, `O`, `P` to switch between Single-line, Two-line, and Auto modes (on loop lines, `I` also switches to Two-line).
 - On the Station Detail page (key `3`), use `I`, `O` to switch between Default and Column modes.
 - Use `K` and `L` keys to switch between operating lines.
@@ -341,6 +343,14 @@ The configuration will be dynamically loaded after saving. Refresh the browser t
 - **global_config.json**
 
 Determines global configurations, such as watermark and hint visibility.
+
+> advance_settings: Advanced settings
+>> enable_advance_settings: Whether to enable advanced settings
+>> open_in_windows: Whether to open in a window; if enabled, a window opens upon program start.
+>> windows_size: Window size, e.g., `1470x720`. Use `full` for full screen.
+>> windows_fps: Window refresh rate. Use -1 for no limit.
+>> expose_to_network: Whether to expose the service to the network.
+>> network_port: Network port, default is 8089.
 
 - **city_config.json**
 

@@ -689,6 +689,8 @@ def get_header_theme(line_color):
 @app.route('/')
 def index():
     """首页 - 默认显示下一站信息（适配direction与终点展示）"""
+    global current_state
+    current_state = load_current_state()
     # 获取线路主题色
     line_color = None
     try:
@@ -992,6 +994,65 @@ def index():
     except Exception:
         run_style = 'default'
     
+    # 下一站换乘徽章（用于头部显示）
+    transfer_badges = []
+    try:
+        next_name = current_state.get('next_station')
+        next_station_info = None
+        
+        # 尝试从 line_info 查找（如果是 dict 列表）
+        if line_info and isinstance(line_info, list):
+            for s in line_info:
+                if isinstance(s, dict) and s.get('station_name') == next_name:
+                    next_station_info = s
+                    break
+        
+        # 如果 line_info 里没找到，尝试单独获取
+        if not next_station_info and tools is not None:
+             try:
+                 info_list = tools.get_station_info(line_name, route_name)
+                 for s in info_list:
+                     if s.get('station_name') == next_name:
+                         next_station_info = s
+                         break
+             except Exception:
+                 pass
+
+        if next_station_info:
+            if tools is not None:
+                try:
+                    current_code = tools._line_code_from_key(line_name)
+                    for code in next_station_info.get('transfer_lines', []):
+                        if code != current_code:
+                            code_str = str(code).strip()
+                            if code_str.isdigit():
+                                key = f"line_{int(code_str)}"
+                                code_disp = str(int(code_str))
+                            else:
+                                key = f"line_{code_str}"
+                                code_disp = code_str
+                            transfer_badges.append({'code': code_disp, 'color': tools.get_line_color(key)})
+                except Exception:
+                    pass
+            else:
+                # 回退模式
+                try:
+                    current_code = _line_code_from_key(line_name)
+                    for code in next_station_info.get('transfer_lines', []):
+                        if code != current_code:
+                            code_str = str(code).strip()
+                            if code_str.isdigit():
+                                key = f"line_{int(code_str)}"
+                                code_disp = str(int(code_str))
+                            else:
+                                key = f"line_{code_str}"
+                                code_disp = code_str
+                            transfer_badges.append({'code': code_disp, 'color': fallback_get_line_color(key)})
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
     return render_template('index.html',
                            line_color=line_color,
                            line_display_name=line_display_name,
@@ -1004,6 +1065,7 @@ def index():
                            loop_ring_label_main=loop_ring_label_main,
                            loop_terminal_main=loop_terminal_main,
                            trans_data=trans_data,
+                           transfer_badges=transfer_badges,
                            run_style=run_style,
                            config=app_config,
                            **current_state)
@@ -1013,6 +1075,8 @@ def index():
 @app.route('/line_map')
 def line_map():
     """线路图页面（基于真实数据渲染）"""
+    global current_state
+    current_state = load_current_state()
     try:
         # 获取线路主题色
         line_color = None
@@ -1276,6 +1340,8 @@ def line_map():
 @app.route('/line_detail')
 def line_detail():
     """线路详情页面（基于真实数据渲染）"""
+    global current_state
+    current_state = load_current_state()
     try:
         line_name = current_state['line_name']
         route_name = current_state['route_name']
@@ -1461,6 +1527,8 @@ def line_detail():
 @app.route('/arrival')
 def arrival():
     """到站信息页面（基于真实数据渲染）"""
+    global current_state
+    current_state = load_current_state()
     try:
         line_name = current_state['line_name']
         route_name = current_state['route_name']
@@ -1509,6 +1577,7 @@ def arrival():
         terminal_station = None
         is_loop = False
         loop_has_terminal = False
+        loop_terminal_station = ''
         try:
             route_data = _get_route_data()
             line_config = route_data.get(line_name, {})
@@ -1519,9 +1588,16 @@ def arrival():
                 if name == route_name:
                     term = (s.get('terminal_station') or '').strip()
                     loop_has_terminal = bool(term)
+                    loop_terminal_station = term
                     break
         except Exception:
             pass
+
+        current_route_stations = []
+        try:
+            current_route_stations = [s.get('station_name') for s in (line_info or []) if isinstance(s, dict) and s.get('station_name')]
+        except Exception:
+            current_route_stations = []
 
         if line_info:
             if is_loop and not loop_has_terminal:
@@ -1595,6 +1671,8 @@ def arrival():
         
         return render_template('arrival.html',
                               current_station_info=current_station_info,
+                              line_info=line_info,
+                              current_route_stations=current_route_stations,
                               line_display_name=line_display_name,
                               line_en_name=line_en_name,
                               next_station_info=next_station_info,
@@ -1606,6 +1684,9 @@ def arrival():
                               line_color=line_color,
                               header_text_color=header_text_color,
                               is_light_theme=is_light_theme,
+                              is_loop=is_loop,
+                              loop_has_terminal=loop_has_terminal,
+                              loop_terminal_station=loop_terminal_station,
                               trans_data=trans_data,
                               carriage_count=carriage_count,
                               config=app_config,
@@ -1964,5 +2045,71 @@ if __name__ == '__main__':
     # 创建必要的目录
     ensure_directories()
     
-    # 运行应用
-    app.run(host='0.0.0.0', port=8089, debug=True)
+    # 加载高级设置
+    config = load_global_config()
+    adv = config.get("advance_settings", {})
+    enable_adv = adv.get("enable_advance_settings", False)
+    
+    host = '127.0.0.1'
+    port = 8089
+    open_window = False
+    window_size = "1280x720"
+    
+    if enable_adv:
+        host = '0.0.0.0' if adv.get("expose_to_network", False) else '127.0.0.1'
+        port = adv.get("network_port", 8089)
+        open_window = adv.get("open_in_windows", False)
+        window_size = adv.get("windows_size", "1280x720")
+    
+    if open_window:
+        try:
+            import webview
+            import threading
+            import time
+
+            def run_server():
+                # 窗口模式下关闭 debug 以避免重复启动
+                app.run(host=host, port=port, debug=False, threaded=True)
+
+            # 启动 Flask 线程
+            server_thread = threading.Thread(target=run_server)
+            server_thread.daemon = True
+            server_thread.start()
+
+            # 等待服务器启动
+            time.sleep(1)
+
+            # 解析窗口大小
+            fullscreen = False
+            if window_size == "full":
+                fullscreen = True
+                width, height = 1280, 720 # 全屏时宽高参数通常会被忽略，但需提供默认值
+            else:
+                try:
+                    width, height = map(int, window_size.split('x'))
+                except Exception:
+                    width, height = 1280, 720
+
+            # 创建并启动窗口
+            if fullscreen:
+                print("正在以全屏模式启动")
+            else:
+                print(f"正在以窗口模式启动: {width}x{height}")
+
+            webview.create_window(
+                'Metro PIS System', 
+                f'http://127.0.0.1:{port}', 
+                width=width, 
+                height=height,
+                fullscreen=fullscreen,
+                resizable=False if not fullscreen else True,
+                frameless=True,      # 无边框模式（隐藏关闭、最小化按钮）
+                easy_drag=True       # 允许通过鼠标点击窗口任意位置拖动
+            )
+            webview.start()
+        except ImportError:
+            print("错误: 未安装 pywebview 库，无法开启窗口模式。请运行: uv pip install pywebview")
+            app.run(host=host, port=port, debug=True)
+    else:
+        # 普通模式运行
+        app.run(host=host, port=port, debug=True)

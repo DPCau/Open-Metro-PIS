@@ -76,7 +76,7 @@
     "line_name": "空港线-Line 3 Konggang",
     "layout": "one_line",
     "type": "linear",
-    "current_carriage": 8,
+    "carriage_count": 8,
     "station_spacing_multiplier": 1,
     "services": [
       {

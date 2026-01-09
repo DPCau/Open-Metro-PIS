@@ -16,7 +16,7 @@
                 <span class="transfer-label" style="font-size: 13px;">Transfer</span>
                 <span class="next-transfer-badges">
                     {% for b in transfer_badges %}
-                    <span class="transfer-badge {% if b.code|string|length > 1 %}wide{% endif %}" data-color="{{ b.color }}">{{ b.code }}</span>
+                    <span class="transfer-badge {% if b.code|string|length > 1 %}wide{% endif %}" style="background-color: {{ b.color }}">{{ b.code }}</span>
                     {% endfor %}
                 </span>
             </div>

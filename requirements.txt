@@ -1,5 +1,5 @@
 flask==2.3.2
 jinja2==3.1.2
 werkzeug==2.3.3
-# ijson用于大文件流式解析，这里放宽版本以兼容解析器
 ijson>=3.2.1,<4.0.0
+pywebview

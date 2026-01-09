@@ -18,6 +18,32 @@
         :root {
             --theme-color: {{ line_color or '#9b5de5' }};
             --header-text-color: {{ header_text_color or '#ffffff' }};
+            --fps: {% if global_config.advance_settings and global_config.advance_settings.enable_advance_settings and global_config.advance_settings.windows_fps|int != -1 %}{{ global_config.advance_settings.windows_fps }}{% else %}60{% endif %};
+        }
+
+        /* 帧率限制：当 FPS 较低时，强制所有 CSS 动画和过渡使用阶梯函数，模拟低帧率感 */
+        {% if global_config.advance_settings and global_config.advance_settings.enable_advance_settings and global_config.advance_settings.windows_fps|int < 60 and global_config.advance_settings.windows_fps|int != -1 %}
+        * {
+            animation-timing-function: steps({{ global_config.advance_settings.windows_fps|int }}) !important;
+            transition-timing-function: steps({{ global_config.advance_settings.windows_fps|int }}) !important;
+        }
+        {% endif %}
+
+        /* 窗口模式基础样式：禁止文字选择，增加全窗口拖动区域感 */
+        body {
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-app-region: drag; /* 允许全窗口拖动（配合 pywebview easy_drag） */
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        /* 排除不需要拖动的交互元素 */
+        .mobile-controls, .control-toggle, .control-menu, .control-btn, a, button {
+            -webkit-app-region: no-drag;
         }
         
         .header {
@@ -352,6 +378,31 @@
             display: none;
         }
     </style>
+    <script>
+        // 全局帧率控制脚本
+        (function() {
+            const targetFps = {% if global_config.advance_settings and global_config.advance_settings.enable_advance_settings %}{{ global_config.advance_settings.windows_fps|int }}{% else %}-1{% endif %};
+            // 如果设置为 -1 (不限制) 或者非法值，直接退出，由浏览器原生控制（支持高刷显示器）
+            if (targetFps === -1 || targetFps <= 0) return;
+            // 如果设置的帧率过高（例如 > 120），在大多数显示器上也没意义，除非是极高刷，通常 60 以上就不再强制拦截以保证性能
+            if (targetFps >= 120) return;
+
+            const frameDuration = 1000 / targetFps;
+            let lastTime = 0;
+            const originalRAF = window.requestAnimationFrame;
+
+            window.requestAnimationFrame = function(callback) {
+                return originalRAF(function(time) {
+                    if (time - lastTime >= frameDuration) {
+                        lastTime = time;
+                        callback(time);
+                    } else {
+                        originalRAF(() => window.requestAnimationFrame(callback));
+                    }
+                });
+            };
+        })();
+    </script>
     <script src="{{ url_for('static', filename='js/common.js') }}"></script>
     {% block head %}{% endblock %}
 </head>

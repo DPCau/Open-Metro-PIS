@@ -3,13 +3,31 @@
 {% block title %}到站信息 - {{ config.app_name }}{% endblock %}
 
 {% block header_subtitle %}
-    {% if next_station_info and next_station_info.terminal_station %}
-        终点站：<strong>{{ next_station_info.terminal_station }}</strong>
-        <div class="line-sub-info-en">Terminal: <strong>{{ trans_data.get(next_station_info.terminal_station, next_station_info.terminal_station or '').replace('<br>', ' ') if trans_data.get(next_station_info.terminal_station, next_station_info.terminal_station or '') else '' }}</strong></div>
+{% if is_loop %}
+    {% set ring_label = '内环运行' if direction|int == 1 else '外环运行' %}
+    {% if loop_has_terminal and loop_terminal_station %}
+        {{ ring_label }} 终点站：<strong>{{ loop_terminal_station }}</strong>
+        <div class="line-sub-info-en">{% if direction|int == 1 %}Inner Loop{% else %}Outer Loop{% endif %} Terminal: <strong>{{ trans_data.get(loop_terminal_station, loop_terminal_station or '').replace('<br>', ' ') if trans_data.get(loop_terminal_station, loop_terminal_station or '') else '' }}</strong></div>
     {% else %}
-        终点站：<strong>{{ terminal_station or '未知' }}</strong>
-        <div class="line-sub-info-en">Terminal: <strong>{{ trans_data.get(terminal_station, terminal_station or 'Unknown').replace('<br>', ' ') if trans_data.get(terminal_station, terminal_station or '') else '' }}</strong></div>
+        <strong>{{ ring_label }}</strong>
+        <div class="line-sub-info-en">{% if direction|int == 1 %}Inner Loop{% else %}Outer Loop{% endif %}</div>
     {% endif %}
+{% else %}
+    {% set terminal_station_for_dir = '' %}
+    {% if current_route_stations and current_route_stations|length > 0 %}
+        {% if direction|int == 0 %}
+            {% set terminal_station_for_dir = current_route_stations[-1] %}
+        {% else %}
+            {% set terminal_station_for_dir = current_route_stations[0] %}
+        {% endif %}
+    {% elif line_info and line_info|length > 0 %}
+        {% set terminal_station_for_dir = (line_info[-1].station_name if direction|int == 0 else line_info[0].station_name) %}
+    {% else %}
+        {% set terminal_station_for_dir = terminal_station or '' %}
+    {% endif %}
+    终点站：<strong>{{ terminal_station_for_dir }}</strong>
+    <div class="line-sub-info-en">Terminal: <strong>{{ trans_data.get(terminal_station_for_dir, terminal_station_for_dir or '').replace('<br>', ' ') if trans_data.get(terminal_station_for_dir, terminal_station_for_dir or '') else '' }}</strong></div>
+{% endif %}
 {% endblock %}
 
 {% block header_right %}
@@ -346,7 +364,7 @@
         const wrapper = document.getElementById('train-wrapper');
         const direction = {{ direction|int }};
         const carriageCount = {{ carriage_count|default(6) }};
-        const currentCarriageNum = 3; // 假设当前车厢为3号
+        const currentCarriageNum = {{ current_carriage|default(1)|int }};
         const themeColor = '{{ line_color or "#9b5de5" }}';
         const doorSide = '{{ door_side }}';
         const nextStation = '{{ next_station }}';
