@@ -325,14 +325,16 @@ def next_route():
     line_name = current_state['line_name']
     direction = current_state.get('direction', 0)
     
-    # 获取该线路下所有的 route 列表
+    # 获取该线路下所有的 route 列表 (过滤掉 disabled=true 的)
     data_dir = get_data_dir()
     route_file = os.path.join(data_dir, 'route.json')
     try:
         with open(route_file, 'r', encoding='utf-8') as f:
             route_data = json.load(f)
             services = route_data.get(line_name, {}).get('services', [])
-            route_names = [s.get('type') or s.get('service_name') for s in services]
+            # 过滤掉 disabled=true 的服务
+            active_services = [s for s in services if not s.get('disabled', False)]
+            route_names = [s.get('type') or s.get('service_name') for s in active_services]
             
             if not route_names:
                 return jsonify({'status': 'error', 'message': '无可用路由'}), 404
@@ -341,24 +343,25 @@ def next_route():
             try:
                 curr_idx = route_names.index(current_route)
             except ValueError:
-                curr_idx = 0
+                # 如果当前路由被禁用了，则跳到第一个可用的
+                curr_idx = -1
                 
             next_idx = (curr_idx + 1) % len(route_names)
             new_route = route_names[next_idx]
             current_state['route_name'] = new_route
+        
+        # 切换路由后，重置到该交路的第一站
+        line_info = None
+        if tools is not None:
+            line_info = tools.get_line_map_info(line_name, new_route)
+        if line_info is None:
+            line_info = fallback_get_line_map_info(line_name, new_route)
             
-            # 切换路由后，重置到该交路的第一站
-            line_info = None
-            if tools is not None:
-                line_info = tools.get_line_map_info(line_name, new_route)
-            if line_info is None:
-                line_info = fallback_get_line_map_info(line_name, new_route)
+        if line_info:
+            current_state['next_station'] = _pick_initial_next_station_for_switch(line_name, new_route, direction, line_info)
                 
-            if line_info:
-                current_state['next_station'] = _pick_initial_next_station_for_switch(line_name, new_route, direction, line_info)
-                    
-            save_current_state(current_state)
-            return jsonify(current_state)
+        save_current_state(current_state)
+        return jsonify(current_state)
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
@@ -385,9 +388,14 @@ def next_line():
             next_idx = (curr_idx + 1) % len(line_names)
             new_line = line_names[next_idx]
             
-            # 切换线路时，默认选择该线路的第一个路由和第一站
+            # 切换线路时，默认选择该线路的第一个路由和第一站 (过滤掉 disabled=true 的)
             new_services = route_data.get(new_line, {}).get('services', [])
-            new_route = new_services[0].get('type') or new_services[0].get('service_name') if new_services else 'route1'
+            active_new_services = [s for s in new_services if not s.get('disabled', False)]
+            if not active_new_services:
+                # 如果没有启用的服务，则回退到第一个（虽然这不应该发生）
+                active_new_services = new_services[:1]
+                
+            new_route = active_new_services[0].get('type') or active_new_services[0].get('service_name') if active_new_services else 'route1'
             
             # 获取新线路的车站列表
             line_info = None
@@ -433,9 +441,13 @@ def prev_line():
             prev_idx = (curr_idx - 1 + len(line_names)) % len(line_names)
             new_line = line_names[prev_idx]
             
-            # 切换线路时，默认选择该线路的第一个路由和第一站
+            # 切换线路时，默认选择该线路的第一个路由和第一站 (过滤掉 disabled=true 的)
             new_services = route_data.get(new_line, {}).get('services', [])
-            new_route = new_services[0].get('type') or new_services[0].get('service_name') if new_services else 'route1'
+            active_new_services = [s for s in new_services if not s.get('disabled', False)]
+            if not active_new_services:
+                active_new_services = new_services[:1]
+                
+            new_route = active_new_services[0].get('type') or active_new_services[0].get('service_name') if active_new_services else 'route1'
             
             # 获取新线路的车站列表
             line_info = None
@@ -586,13 +598,16 @@ def prev_route():
     line_name = current_state['line_name']
     direction = current_state.get('direction', 0)
     
+    # 获取该线路下所有的 route 列表 (过滤掉 disabled=true 的)
     data_dir = get_data_dir()
     route_file = os.path.join(data_dir, 'route.json')
     try:
         with open(route_file, 'r', encoding='utf-8') as f:
             route_data = json.load(f)
             services = route_data.get(line_name, {}).get('services', [])
-            route_names = [s.get('type') or s.get('service_name') for s in services]
+            # 过滤掉 disabled=true 的服务
+            active_services = [s for s in services if not s.get('disabled', False)]
+            route_names = [s.get('type') or s.get('service_name') for s in active_services]
             
             if not route_names:
                 return jsonify({'status': 'error', 'message': '无可用路由'}), 404
@@ -601,7 +616,8 @@ def prev_route():
             try:
                 curr_idx = route_names.index(current_route)
             except ValueError:
-                curr_idx = 0
+                # 如果当前路由被禁用了，则跳到第一个可用的
+                curr_idx = len(route_names)
                 
             prev_idx = (curr_idx - 1 + len(route_names)) % len(route_names)
             new_route = route_names[prev_idx]
@@ -801,17 +817,15 @@ def index():
             except Exception:
                 return '外环运行'
         # 获取该线路下的所有服务名称
-        routes = []
-        if tools is not None:
-            try:
-                routes = tools.get_routes_for_line(line_name)
-            except Exception:
-                routes = []
-        if not routes:
-            try:
-                routes = fallback_get_routes_for_line(line_name)
-            except Exception:
-                routes = []
+        all_services_raw = []
+        try:
+            route_data = _get_route_data()
+            all_services_raw = route_data.get(line_name, {}).get('services', [])
+        except Exception:
+            all_services_raw = []
+            
+        routes = [s.get('type') or s.get('service_name') for s in all_services_raw]
+        
         # 主线信息
         main_count = 0
         try:
@@ -854,26 +868,35 @@ def index():
         main_group = _service_group(main_raw)
         main_terminal_field = (main_raw or {}).get('terminal_station')
         main_has_terminal = bool((main_terminal_field or '').strip())
-        route_services.append({
-            'name': route_name,
-            'label': (main_raw or {}).get('label'),
-            'branch': (main_raw or {}).get('branch'),
-            'group': main_group,
-            'is_main': True,
-            'is_loop': (line_type == 'loop'),
-            'ring_label': _ring_label_by_direction(direction) if line_type == 'loop' else '',
-            'has_terminal': main_has_terminal if line_type == 'loop' else True,
-            'start': (_ring_label_by_direction(direction) if line_type == 'loop' else start_station),
-            'end': (main_terminal_field if line_type == 'loop' else terminal_station),
-            'count': max(2, min(6, main_count)),
-            'total': main_count,
-            'stations': main_stations
-        })
+        
+        # 即使是主路线，如果 disabled=true，也不应该在 route_services 中（首页运营路线显示）
+        if not (main_raw or {}).get('disabled', False):
+            route_services.append({
+                'name': route_name,
+                'label': (main_raw or {}).get('label'),
+                'branch': (main_raw or {}).get('branch'),
+                'group': main_group,
+                'is_main': True,
+                'is_loop': (line_type == 'loop'),
+                'ring_label': _ring_label_by_direction(direction) if line_type == 'loop' else '',
+                'has_terminal': main_has_terminal if line_type == 'loop' else True,
+                'start': (_ring_label_by_direction(direction) if line_type == 'loop' else start_station),
+                'end': (main_terminal_field if line_type == 'loop' else terminal_station),
+                'count': max(2, min(6, main_count)),
+                'total': main_count,
+                'stations': main_stations
+            })
+            
         # 其他服务
         for r in routes:
             if r == route_name:
                 continue
             try:
+                raw = _raw_service_by_name(r)
+                # 过滤掉 disabled=true 的服务
+                if (raw or {}).get('disabled', False):
+                    continue
+                    
                 other_info = []
                 if tools is not None:
                     try:
@@ -890,7 +913,6 @@ def index():
                 else:
                     start_other = other_names[0] if len(other_names) > 0 else ''
                     end_other = other_names[-1] if len(other_names) > 0 else ''
-                raw = _raw_service_by_name(r)
                 other_group = _service_group(raw)
                 terminal_field = (raw or {}).get('terminal_station')
                 has_terminal = bool((terminal_field or '').strip())
@@ -915,17 +937,9 @@ def index():
     except Exception:
         route_services = []
 
-    # 按route后的数字排序（稳定排序，不改变非数字名的相对顺序）
-    def _route_num(n):
-        try:
-            if isinstance(n, str) and n.startswith('route'):
-                digits = ''.join([c for c in n[5:] if c.isdigit()])
-                if digits:
-                    return int(digits)
-        except Exception:
-            pass
-        return 10**9
-    route_services.sort(key=lambda s: _route_num(s.get('name', '')))
+    # 按 route.json 中的原始顺序稳定排序
+    route_order = {name: i for i, name in enumerate(routes)}
+    route_services.sort(key=lambda s: route_order.get(s.get('name', ''), 999))
 
     # 首页底部“终点站”信息在环线时：仅基于主服务的 terminal_station；direction 仅影响文案
     loop_ring_label_main = ''
