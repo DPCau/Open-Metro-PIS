@@ -6,9 +6,9 @@
     "hint_text_narrow": "在线模式下可能卡顿，若需要去除水印请自行部署，本项目完全免费\n项目开源地址：https://github.com/DPCau/Open-Metro-PIS\n点击右下角🎮按钮进行操作",
     "advance_settings": {
         "enable_advance_settings": true,
-        "open_in_windows": false,
+        "open_in_windows": true,
         "windows_size": "1470x720",
-        "windows_fps": 60,
+        "windows_fps": 10,
         "expose_to_network": true,
         "network_port": 8089
     }

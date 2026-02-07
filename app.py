@@ -205,7 +205,7 @@ def load_current_state():
         'next_station': '',
         'direction': 0,
         'door_side': '本侧',
-        'current_carriage': 0
+        'current_carriage': 1
     }
     try:
         if os.path.exists(STATE_FILE):

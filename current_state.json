@@ -1,8 +1,8 @@
 {
-    "line_name": "line_9",
+    "line_name": "line_6",
     "route_name": "route1",
-    "next_station": "金融城东",
+    "next_station": "建设北路",
     "direction": 0,
     "door_side": "本侧",
-    "current_carriage": 2
+    "current_carriage": 1
 }

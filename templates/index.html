@@ -429,6 +429,7 @@
         {% endif %}
         {% for svc in route_services_display %}
             {% if svc.is_loop %}
+                {% if svc.is_main %}
                 <div class="loop-visual-container">
                     <div class="loop-ring-wrapper">
                          <svg viewBox="0 0 100 100" class="loop-svg {{ 'spin-cw' if direction|int == 1 else 'spin-ccw' }}">
@@ -463,6 +464,7 @@
                         </div>
                     {% endif %}
                 </div>
+                {% endif %}
             {% else %}
             <div class="detail-grid detail-row" style="--station-count: {{ sc }}; --row-color: {{ (line_color or '#9b5de5') if svc.is_main else '#cfcfcf' }};">
                 <div class="detail-row-label">{% if svc.label %}{{ svc.label }}{% else %}运营线路{% if route_services_display|length > 1 %}{{ loop.index }}{% endif %}{% endif %}</div>
@@ -502,6 +504,7 @@
             {% endif %}
             {% set has_multiple = route_services_display|length > 1 %}
             {% for svc in route_services_display %}
+                {% if not svc.is_loop or svc.is_main %}
                 <div class="route-label {{ 'active' if svc.is_main else '' }}">{% if svc.label %}{{ svc.label }}{% else %}运营线路{% if has_multiple %}{{ loop.index }}{% endif %}{% endif %}</div>
                 <div class="route-line {{ 'active' if svc.is_main else '' }} {{ 'loop' if svc.is_loop else '' }} {{ 'single' if svc.is_loop and not svc.has_terminal else '' }}" data-total="{{ svc.total }}" data-stations="{{ (svc.stations or []) | join('|') }}" data-next="{{ next_station }}" data-direction="{{ direction }}" data-terminal="{{ svc.end if svc.is_loop else terminal_station }}" data-is-loop="{{ 1 if svc.is_loop else 0 }}" data-has-terminal="{{ 1 if svc.has_terminal else 0 }}">
                      <div class="terminal-station">
@@ -526,6 +529,7 @@
                      </div>
                       {% endif %}
                  </div>
+                {% endif %}
             {% endfor %}
         {% else %}
             <div class="route-label active">运营线路</div>
