@@ -2123,7 +2123,7 @@ if __name__ == '__main__':
             webview.start()
         except ImportError:
             print("错误: 未安装 pywebview 库，无法开启窗口模式。请运行: uv pip install pywebview")
-            app.run(host=host, port=port, debug=True)
+            app.run(host=host, port=port)
     else:
         # 普通模式运行
-        app.run(host=host, port=port, debug=True)
+        app.run(host=host, port=port)

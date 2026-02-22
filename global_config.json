@@ -8,7 +8,7 @@
         "enable_advance_settings": true,
         "open_in_windows": true,
         "windows_size": "1470x720",
-        "windows_fps": 10,
+        "windows_fps": -1,
         "expose_to_network": true,
         "network_port": 8089
     }

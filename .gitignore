@@ -4,3 +4,7 @@
 */__pycache__/
 *.ttf
 config/config.json
+*.dist
+*.bin
+fake_*
+.waylog
