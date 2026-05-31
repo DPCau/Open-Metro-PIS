@@ -1,8 +1,9 @@
 {
-    "line_name": "line_18",
+    "line_name": "line_30",
     "route_name": "route1",
-    "next_station": "火车南站",
+    "next_station": "龙泉驿火车站南",
     "direction": 0,
     "door_side": "本侧",
-    "current_carriage": 1
+    "current_carriage": 1,
+    "schedule_index": 1
 }

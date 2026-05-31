@@ -104,11 +104,11 @@
         align-items: center;
         justify-content: space-between; /* 两端对齐 */
         gap: 0; /* 两端对齐时不用gap */
-        padding: 40px 60px; /* 给左右留边距 */
+        padding: 40px 5px; /* 给左右留边距 */
     }
     .station-node {
         position: relative;
-        width: 140px;
+        width: 90px;
         height: 96px;
         flex: 0 0 auto;
         z-index: 2; /* 确保站点层级在连接线之上 */
@@ -172,6 +172,7 @@
     }
     .station-name {
         font-size: 12px;
+        font-weight: bold;
         color: #333;
         text-align: center;
         line-height: 1.2;
@@ -231,7 +232,8 @@
         z-index: 3;
     }
     .transfer-badge {
-        width: 22px;
+        width: auto;
+        min-width: 22px;
         height: 22px;
         border-radius: 50%;
         display: inline-flex;
@@ -240,6 +242,7 @@
         color: #fff;
         font-size: 12px;
         font-weight: bold;
+        white-space: nowrap;
     }
     .connector {
         position: absolute;
@@ -743,7 +746,7 @@ function layoutLocalRow() {
 
     // 计算可见数量（至少3），按宽度增加
     const containerWidth = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
-    const stationBlockWidth = 140; // 节点+标签的估算宽度
+    const stationBlockWidth = 90; // 节点+标签的估算宽度
     const padding = 120;           // 左右边距合计（与 .local-line-row 的 padding 对齐）
     const maxByWidth = Math.max(3, Math.floor((containerWidth - padding) / stationBlockWidth));
 

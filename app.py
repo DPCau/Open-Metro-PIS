@@ -205,12 +205,17 @@ def load_current_state():
         'next_station': '',
         'direction': 0,
         'door_side': '本侧',
-        'current_carriage': 1
+        'current_carriage': 1,
+        'schedule_index': 0
     }
     try:
         if os.path.exists(STATE_FILE):
             with open(STATE_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                data = json.load(f)
+                if isinstance(data, dict):
+                    merged = default_state.copy()
+                    merged.update(data)
+                    return merged
     except Exception as e:
         print(f"加载状态文件失败: {e}")
     return default_state
@@ -679,6 +684,196 @@ def next_station_no_refresh():
             pass
             
     return jsonify({'status': 'error', 'message': '无法切换到下一站'}), 400
+
+def _normalize_schedule_config(raw_config):
+    """兼容两种班次配置格式：简写列表或带 display_count 的对象。"""
+    if isinstance(raw_config, dict):
+        display_count = raw_config.get('display_count', 2)
+        sequence = raw_config.get('route_order') or raw_config.get('sequence') or raw_config.get('routes') or []
+    elif isinstance(raw_config, list):
+        display_count = 2
+        sequence = raw_config
+    else:
+        display_count = 2
+        sequence = []
+
+    try:
+        display_count = int(display_count)
+    except Exception:
+        display_count = 2
+    display_count = max(1, min(display_count, 6))
+
+    normalized_sequence = []
+    for item in sequence:
+        if isinstance(item, dict):
+            route = item.get('route') or item.get('route_name') or item.get('service_name') or item.get('type')
+            if route:
+                normalized_sequence.append(str(route))
+        elif isinstance(item, int):
+            normalized_sequence.append(f"route{item}")
+        elif isinstance(item, str):
+            stripped = item.strip()
+            if not stripped:
+                continue
+            normalized_sequence.append(f"route{stripped}" if stripped.isdigit() else stripped)
+
+    return {
+        'display_count': display_count,
+        'sequence': normalized_sequence
+    }
+
+def _get_schedule_config():
+    if 'schedule.json' not in _DATA_CACHE:
+        _DATA_CACHE['schedule.json'] = _load_json('schedule.json')
+    return _DATA_CACHE['schedule.json'] if isinstance(_DATA_CACHE['schedule.json'], dict) else {}
+
+def _get_service_route_name(service):
+    if not isinstance(service, dict):
+        return ''
+    return service.get('type') or service.get('service_name') or service.get('name') or ''
+
+def _get_service_terminal_station(line_name, route_name, direction=0):
+    """根据线路、交路和方向计算终点站。"""
+    route_data = _get_route_data()
+    line_cfg = route_data.get(line_name, {}) if isinstance(route_data, dict) else {}
+    line_type = line_cfg.get('type', 'linear') if isinstance(line_cfg, dict) else 'linear'
+    services = line_cfg.get('services', []) if isinstance(line_cfg, dict) else []
+
+    service = None
+    for item in services:
+        if _get_service_route_name(item) == route_name:
+            service = item
+            break
+
+    if not isinstance(service, dict):
+        return ''
+
+    terminal = (service.get('terminal_station') or '').strip()
+    if terminal:
+        return terminal
+
+    if line_type == 'loop':
+        return ''
+
+    stations = service.get('stations', [])
+    if not isinstance(stations, list) or not stations:
+        return ''
+
+    try:
+        direction = int(direction or 0)
+    except Exception:
+        direction = 0
+
+    return str(stations[0] if direction == 1 else stations[-1])
+
+def _ring_label_for_route(route_name, direction=0):
+    """环线班次显示名称。由当前运行方向决定，不由交路编号决定。"""
+    try:
+        return '内环' if int(direction or 0) == 1 else '外环'
+    except Exception:
+        return '外环'
+
+def _build_schedule_entries(line_name, schedule_index=0):
+    """构建班次展示页需要显示的连续班次。"""
+    route_data = _get_route_data()
+    line_cfg = route_data.get(line_name, {}) if isinstance(route_data, dict) else {}
+    services = line_cfg.get('services', []) if isinstance(line_cfg, dict) else []
+    active_route_names = [
+        _get_service_route_name(s)
+        for s in services
+        if _get_service_route_name(s) and not s.get('disabled', False)
+    ]
+
+    schedule_config = _get_schedule_config()
+    raw_line_schedule = schedule_config.get(line_name, {}) if isinstance(schedule_config, dict) else {}
+    normalized = _normalize_schedule_config(raw_line_schedule)
+    sequence = [route for route in normalized.get('sequence', []) if route in active_route_names]
+
+    if not sequence:
+        sequence = active_route_names[:]
+
+    display_count = normalized.get('display_count', 2) or 2
+    if not sequence:
+        return [], 0, display_count
+
+    try:
+        schedule_index = int(schedule_index or 0)
+    except Exception:
+        schedule_index = 0
+    schedule_index = schedule_index % len(sequence)
+
+    trans_data = _get_trans_data()
+    direction = current_state.get('direction', 0)
+    line_type = line_cfg.get('type', 'linear') if isinstance(line_cfg, dict) else 'linear'
+    is_loop = line_type == 'loop'
+    next_station = current_state.get('next_station', '')
+    next_station_en = trans_data.get(next_station, next_station) if isinstance(trans_data, dict) else next_station
+    if isinstance(next_station_en, str):
+        next_station_en = re.sub(r'<\s*br\s*/?\s*>', ' ', next_station_en, flags=re.IGNORECASE)
+        next_station_en = re.sub(r'\s+', ' ', next_station_en).strip()
+    entries = []
+    for offset in range(display_count):
+        route_name = sequence[(schedule_index + offset) % len(sequence)]
+        terminal_station = _get_service_terminal_station(line_name, route_name, direction)
+        has_terminal = bool((terminal_station or '').strip())
+        terminal_station_en = trans_data.get(terminal_station, terminal_station) if isinstance(trans_data, dict) else terminal_station
+        if isinstance(terminal_station_en, str):
+            terminal_station_en = re.sub(r'<\s*br\s*/?\s*>', ' ', terminal_station_en, flags=re.IGNORECASE)
+            terminal_station_en = re.sub(r'\s+', ' ', terminal_station_en).strip()
+        entries.append({
+            'route_name': route_name,
+            'terminal_station': terminal_station,
+            'terminal_station_en': terminal_station_en,
+            'is_loop': is_loop,
+            'has_terminal': has_terminal,
+            'ring_label': _ring_label_for_route(route_name, direction) if is_loop else '',
+            'next_station': next_station if is_loop else '',
+            'next_station_en': next_station_en if is_loop else ''
+        })
+
+    return entries, schedule_index, display_count
+
+def _advance_schedule(delta):
+    global current_state
+    line_name = current_state.get('line_name')
+    entries, index, _display_count = _build_schedule_entries(line_name, current_state.get('schedule_index', 0))
+
+    route_data = _get_route_data()
+    line_cfg = route_data.get(line_name, {}) if isinstance(route_data, dict) else {}
+    services = line_cfg.get('services', []) if isinstance(line_cfg, dict) else []
+    schedule_config = _get_schedule_config()
+    raw_line_schedule = schedule_config.get(line_name, {}) if isinstance(schedule_config, dict) else {}
+    normalized = _normalize_schedule_config(raw_line_schedule)
+    active_route_names = [
+        _get_service_route_name(s)
+        for s in services
+        if _get_service_route_name(s) and not s.get('disabled', False)
+    ]
+    sequence = [route for route in normalized.get('sequence', []) if route in active_route_names] or active_route_names
+
+    if not sequence:
+        return jsonify({'status': 'error', 'message': '无可用班次'}), 404
+
+    new_index = (index + delta) % len(sequence)
+    current_state['schedule_index'] = new_index
+    save_current_state(current_state)
+    entries, new_index, display_count = _build_schedule_entries(line_name, new_index)
+    return jsonify({
+        'status': 'success',
+        'schedule_index': new_index,
+        'display_count': display_count,
+        'entries': entries
+    })
+
+@app.route('/api/state/schedule/next', methods=['POST'])
+def next_schedule():
+    """班次页切换到下一组班次 (D 键)"""
+    return _advance_schedule(1)
+
+@app.route('/api/state/schedule/prev', methods=['POST'])
+def prev_schedule():
+    """班次页切换到上一组班次 (A 键)"""
+    return _advance_schedule(-1)
 
 def get_header_theme(line_color):
     """计算头部对比度主题"""
@@ -1707,6 +1902,55 @@ def arrival():
                               **current_state)
     except Exception as e:
         error_msg = f"获取到站信息失败: {str(e)}"
+        print(error_msg)
+        return error_msg, 500
+
+@app.route('/schedule')
+def schedule():
+    """班次展示页。"""
+    global current_state
+    current_state = load_current_state()
+    try:
+        line_name = current_state.get('line_name', '')
+
+        line_display_name = line_name
+        line_en_name = None
+        if tools is not None:
+            try:
+                line_display_name = tools.get_line_display_name(line_name)
+                line_en_name = tools.get_line_en_name(line_name)
+            except Exception:
+                pass
+        if not line_display_name or line_display_name == line_name:
+            line_display_name = fallback_get_line_display_name(line_name)
+        if not line_en_name:
+            line_en_name = fallback_get_line_en_name(line_name)
+
+        line_color = None
+        if tools is not None:
+            try:
+                line_color = tools.get_line_color(line_name)
+            except Exception:
+                pass
+        if line_color is None:
+            line_color = fallback_get_line_color(line_name) or '#2f6bff'
+        header_text_color, is_light_theme = get_header_theme(line_color)
+
+        entries, schedule_index, display_count = _build_schedule_entries(line_name, current_state.get('schedule_index', 0))
+        current_state['schedule_index'] = schedule_index
+
+        return render_template('schedule.html',
+                               entries=entries,
+                               display_count=display_count,
+                               line_display_name=line_display_name,
+                               line_en_name=line_en_name,
+                               line_color=line_color,
+                               header_text_color=header_text_color,
+                               is_light_theme=is_light_theme,
+                               config=app_config,
+                               **current_state)
+    except Exception as e:
+        error_msg = f"获取班次信息失败: {str(e)}"
         print(error_msg)
         return error_msg, 500
 

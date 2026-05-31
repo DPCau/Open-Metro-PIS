@@ -113,9 +113,24 @@ function navigateTo(page) {
     window.location.href = page;
 }
 
+function updateSchedule(direction) {
+    const endpoint = direction === 'prev' ? '/api/state/schedule/prev' : '/api/state/schedule/next';
+    fetch(endpoint, { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                console.log('已切换班次:', data.schedule_index);
+                window.location.reload();
+            } else {
+                console.error('切换班次失败:', data.message);
+            }
+        })
+        .catch(err => console.error('切换班次失败:', err));
+}
+
 // 键盘快捷键监听
 document.addEventListener('keydown', function(event) {
-    // 1 -> 首页, 2 -> 线路图, 3 -> 线路详情
+    // 1 -> 首页, 2 -> 线路图, 3 -> 线路详情, 4 -> 到站, 5 -> 班次
     if (event.key === '1') {
         navigateTo('/');
     } else if (event.key === '2') {
@@ -124,6 +139,8 @@ document.addEventListener('keydown', function(event) {
         navigateTo('/line_detail');
     } else if (event.key === '4') {
             navigateTo('/arrival');
+    } else if (event.key === '5') {
+            navigateTo('/schedule');
         } else if (event.key.toLowerCase() === 't') {
             // T 键 -> 切换开门侧
             fetch('/api/state/door/toggle', { method: 'POST' })
@@ -170,6 +187,10 @@ document.addEventListener('keydown', function(event) {
             })
             .catch(err => console.error('切换方向失败:', err));
     } else if (event.key.toLowerCase() === 's') {
+        if (window.location.pathname === '/schedule') {
+            updateSchedule('next');
+            return;
+        }
         // S 键 -> 切换下一个路由
         fetch('/api/state/route/next', { method: 'POST' })
             .then(response => response.json())
@@ -179,6 +200,10 @@ document.addEventListener('keydown', function(event) {
             })
             .catch(err => console.error('切换路由失败:', err));
     } else if (event.key.toLowerCase() === 'w') {
+        if (window.location.pathname === '/schedule') {
+            updateSchedule('prev');
+            return;
+        }
         // W 键 -> 切换上一个路由
         fetch('/api/state/route/prev', { method: 'POST' })
             .then(response => response.json())
