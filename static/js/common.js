@@ -120,7 +120,11 @@ function updateSchedule(direction) {
         .then(data => {
             if (data.status === 'success') {
                 console.log('已切换班次:', data.schedule_index);
-                window.location.reload();
+                if (window.location.pathname === '/schedule' && typeof window.applyScheduleData === 'function') {
+                    window.applyScheduleData(data);
+                } else {
+                    window.location.reload();
+                }
             } else {
                 console.error('切换班次失败:', data.message);
             }
@@ -140,6 +144,12 @@ document.addEventListener('keydown', function(event) {
     } else if (event.key === '4') {
             navigateTo('/arrival');
     } else if (event.key === '5') {
+            if (window.location.pathname === '/schedule') {
+                if (typeof window.refreshSchedulePage === 'function') {
+                    window.refreshSchedulePage();
+                }
+                return;
+            }
             navigateTo('/schedule');
         } else if (event.key.toLowerCase() === 't') {
             // T 键 -> 切换开门侧
@@ -160,6 +170,10 @@ document.addEventListener('keydown', function(event) {
                     }
                 });
         } else if (event.key.toLowerCase() === 'd') {
+        if (window.location.pathname === '/schedule' && typeof window.switchScheduleStation === 'function') {
+            window.switchScheduleStation('next');
+            return;
+        }
         // D 键 -> 下一站
         fetch('/api/state/next', { method: 'POST' })
             .then(response => response.json())
@@ -169,6 +183,10 @@ document.addEventListener('keydown', function(event) {
             })
             .catch(err => console.error('切换下一站失败:', err));
     } else if (event.key.toLowerCase() === 'a') {
+        if (window.location.pathname === '/schedule' && typeof window.switchScheduleStation === 'function') {
+            window.switchScheduleStation('prev');
+            return;
+        }
         // A 键 -> 上一站
         fetch('/api/state/prev', { method: 'POST' })
             .then(response => response.json())
@@ -213,6 +231,10 @@ document.addEventListener('keydown', function(event) {
             })
             .catch(err => console.error('切换路由失败:', err));
     } else if (event.key.toLowerCase() === 'l') {
+        if (window.location.pathname === '/schedule' && typeof window.switchScheduleLine === 'function') {
+            window.switchScheduleLine('next');
+            return;
+        }
         // L 键 -> 切换下一条线路
         fetch('/api/state/line/next', { method: 'POST' })
             .then(response => response.json())
@@ -222,6 +244,10 @@ document.addEventListener('keydown', function(event) {
             })
             .catch(err => console.error('切换线路失败:', err));
     } else if (event.key.toLowerCase() === 'k') {
+        if (window.location.pathname === '/schedule' && typeof window.switchScheduleLine === 'function') {
+            window.switchScheduleLine('prev');
+            return;
+        }
         // K 键 -> 切换上一条线路
         fetch('/api/state/line/prev', { method: 'POST' })
             .then(response => response.json())

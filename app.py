@@ -814,6 +814,13 @@ def _build_schedule_entries(line_name, schedule_index=0):
     entries = []
     for offset in range(display_count):
         route_name = sequence[(schedule_index + offset) % len(sequence)]
+        service = None
+        for item in services:
+            if _get_service_route_name(item) == route_name:
+                service = item
+                break
+        service_label = (service or {}).get('label', '')
+        express_label = service_label if service_label == '直达 Express' else ''
         terminal_station = _get_service_terminal_station(line_name, route_name, direction)
         has_terminal = bool((terminal_station or '').strip())
         terminal_station_en = trans_data.get(terminal_station, terminal_station) if isinstance(trans_data, dict) else terminal_station
@@ -826,6 +833,8 @@ def _build_schedule_entries(line_name, schedule_index=0):
             'terminal_station_en': terminal_station_en,
             'is_loop': is_loop,
             'has_terminal': has_terminal,
+            'label': service_label,
+            'express_label': express_label,
             'ring_label': _ring_label_for_route(route_name, direction) if is_loop else '',
             'next_station': next_station if is_loop else '',
             'next_station_en': next_station_en if is_loop else ''
@@ -864,6 +873,59 @@ def _advance_schedule(delta):
         'display_count': display_count,
         'entries': entries
     })
+
+def _get_schedule_payload():
+    """返回当前第5页需要的班次与线路元数据，供局部刷新使用。"""
+    global current_state
+    current_state = load_current_state()
+    line_name = current_state.get('line_name', '')
+
+    line_display_name = line_name
+    line_en_name = None
+    if tools is not None:
+        try:
+            line_display_name = tools.get_line_display_name(line_name)
+            line_en_name = tools.get_line_en_name(line_name)
+        except Exception:
+            pass
+    if not line_display_name or line_display_name == line_name:
+        line_display_name = fallback_get_line_display_name(line_name)
+    if not line_en_name:
+        line_en_name = fallback_get_line_en_name(line_name)
+
+    line_color = None
+    if tools is not None:
+        try:
+            line_color = tools.get_line_color(line_name)
+        except Exception:
+            pass
+    if line_color is None:
+        line_color = fallback_get_line_color(line_name) or '#2f6bff'
+    header_text_color, is_light_theme = get_header_theme(line_color)
+
+    entries, schedule_index, display_count = _build_schedule_entries(line_name, current_state.get('schedule_index', 0))
+    current_state['schedule_index'] = schedule_index
+
+    return {
+        'status': 'success',
+        'entries': entries,
+        'display_count': display_count,
+        'schedule_index': schedule_index,
+        'line_name': line_name,
+        'line_display_name': line_display_name,
+        'line_en_name': line_en_name,
+        'line_color': line_color,
+        'header_text_color': header_text_color,
+        'is_light_theme': is_light_theme
+    }
+
+@app.route('/api/schedule/data')
+def api_schedule_data():
+    """获取第5页当前线路班次数据，用于无闪烁局部刷新。"""
+    try:
+        return jsonify(_get_schedule_payload())
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 @app.route('/api/state/schedule/next', methods=['POST'])
 def next_schedule():

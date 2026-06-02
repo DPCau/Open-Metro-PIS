@@ -8,3 +8,4 @@ config/config.json
 *.bin
 fake_*
 .waylog
+private/

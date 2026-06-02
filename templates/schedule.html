@@ -15,6 +15,7 @@
         --board-yellow: #ffad25;
         --board-yellow-soft: #ffd15f;
         --board-white: #f4f6ff;
+        --board-line-text-color: {{ header_text_color or '#ffffff' }};
     }
 
     body {
@@ -45,6 +46,11 @@
         box-sizing: border-box;
         font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif;
         overflow: hidden;
+        opacity: 0;
+    }
+
+    .schedule-screen.is-fitted {
+        opacity: 1;
     }
 
     .schedule-topbar {
@@ -72,7 +78,7 @@
         padding: clamp(9px, 1.25vh, 15px) clamp(18px, 2.3vw, 42px);
         border-radius: 999px / 72%;
         background: var(--board-line-color);
-        color: {{ header_text_color or '#ffffff' }};
+        color: var(--board-line-text-color);
         box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 0 24px color-mix(in srgb, var(--board-line-color) 45%, transparent);
         font-size: clamp(22px, 3vw, 48px);
         font-weight: 950;
@@ -183,6 +189,42 @@
         text-overflow: ellipsis;
     }
 
+    .express-badge {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        vertical-align: middle;
+        flex: 0 0 auto;
+        margin-left: .18em;
+        padding: .18em .54em .20em;
+        border-radius: .28em;
+        background: var(--board-line-color);
+        color: #fff;
+        font-size: clamp(22px, 2.2vw, 42px);
+        font-weight: 950;
+        line-height: .9;
+        letter-spacing: .02em;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.22), 0 0 .42em rgba(0,0,0,.18);
+        white-space: nowrap;
+    }
+
+    .express-badge-cn {
+        display: block;
+        font-size: 1em;
+        line-height: .9;
+    }
+
+    .express-badge-en {
+        display: block;
+        margin-top: .16em;
+        font-family: "Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        font-size: .46em;
+        font-weight: 900;
+        line-height: 1;
+        letter-spacing: .02em;
+    }
+
     .terminal-area {
         min-width: 0;
         min-height: 0;
@@ -193,6 +235,29 @@
         padding-left: clamp(28px, 4.5vw, 86px);
         padding-right: clamp(10px, 2vw, 34px);
         overflow: hidden;
+    }
+
+    .terminal-cn-row {
+        width: 100%;
+        min-width: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: .22em;
+        color: var(--board-white);
+        font-size: clamp(72px, 10.5vw, 176px);
+        font-weight: 950;
+        line-height: 1;
+        letter-spacing: .07em;
+        text-shadow: 0 5px 0 rgba(0,0,0,.24), 0 0 22px rgba(255,255,255,.12);
+    }
+
+    .terminal-cn-row .terminal-cn {
+        flex: 1 1 auto;
+        min-width: 0;
+        font: inherit;
+        letter-spacing: inherit;
+        text-shadow: inherit;
     }
 
     .terminal-cn,
@@ -343,7 +408,14 @@
                         <div class="terminal-extra-cn fit-terminal-cn">下一站: {{ entry.next_station or '暂无数据' }}</div>
                         <div class="terminal-extra-en fit-terminal-en">Next station: {{ entry.next_station_en or 'No data' }}</div>
                     {% else %}
-                        <div class="terminal-cn fit-terminal-cn">{{ entry.terminal_station or '暂无数据' }}</div>
+                        {% if entry.express_label %}
+                            <div class="terminal-cn-row">
+                                <div class="terminal-cn fit-terminal-cn">{{ entry.terminal_station or '暂无数据' }}</div>
+                                <span class="express-badge"><span class="express-badge-cn">直达</span><span class="express-badge-en">Express</span></span>
+                            </div>
+                        {% else %}
+                            <div class="terminal-cn fit-terminal-cn">{{ entry.terminal_station or '暂无数据' }}</div>
+                        {% endif %}
                         <div class="terminal-en fit-terminal-en">{{ entry.terminal_station_en or 'No data' }}</div>
                     {% endif %}
                     </div>
@@ -469,8 +541,8 @@
     function fitTerminalBlock(area) {
         if (!area) return;
         const fitBox = area.querySelector('.terminal-fit');
-        const cnNodes = Array.from(area.querySelectorAll('.terminal-fit > .fit-terminal-cn'));
-        const enNodes = Array.from(area.querySelectorAll('.terminal-fit > .fit-terminal-en'));
+        const cnNodes = Array.from(area.querySelectorAll('.terminal-fit .fit-terminal-cn'));
+        const enNodes = Array.from(area.querySelectorAll('.terminal-fit .fit-terminal-en'));
         const nodes = [...cnNodes, ...enNodes];
         nodes.forEach(resetFontSize);
         if (!fitBox || nodes.length === 0) return;
@@ -483,7 +555,11 @@
                 node.style.fontSize = `${base * scale}px`;
             });
         };
-        const groupTooWide = targetNodes => targetNodes.some(node => measureNaturalWidth(node) > maxWidth);
+        const nodeAvailableWidth = node => {
+            const rectWidth = node.getBoundingClientRect().width;
+            return Math.max(1, rectWidth || contentWidth(node.parentElement || area) || maxWidth);
+        };
+        const groupTooWide = targetNodes => targetNodes.some(node => measureNaturalWidth(node) > nodeAvailableWidth(node));
         const blockTooTall = () => fitBox.scrollHeight > maxHeight || nodes.reduce((sum, node) => sum + outerHeight(node), 0) > maxHeight;
 
         let cnScale = 1;
@@ -524,9 +600,9 @@
         }
     }
 
-    function fitScheduleText() {
-        document.querySelectorAll('.fit-top').forEach(el => fitOneLine(el, { minPx: 6 }));
-        document.querySelectorAll('.fit-label').forEach(el => {
+    function fitScheduleText(root = document) {
+        root.querySelectorAll('.fit-top').forEach(el => fitOneLine(el, { minPx: 6 }));
+        root.querySelectorAll('.fit-label').forEach(el => {
             const card = el.closest('.train-card') || el.parentElement;
             fitOneLine(el, {
                 minPx: 6,
@@ -534,18 +610,172 @@
                 heightLimit: Math.max(1, card.clientHeight * 0.28)
             });
         });
-        document.querySelectorAll('.terminal-area').forEach(fitTerminalBlock);
+        root.querySelectorAll('.terminal-area').forEach(fitTerminalBlock);
+        const screen = root === document ? document.querySelector('.schedule-screen') : null;
+        if (screen) screen.classList.add('is-fitted');
+    }
+
+    let fitRaf = null;
+    function scheduleFit() {
+        if (fitRaf) cancelAnimationFrame(fitRaf);
+        fitRaf = requestAnimationFrame(() => {
+            fitRaf = requestAnimationFrame(() => {
+                fitRaf = null;
+                fitScheduleText();
+            });
+        });
     }
 
     updateScheduleClock();
-    requestAnimationFrame(() => requestAnimationFrame(fitScheduleText));
+    scheduleFit();
     setInterval(() => {
         updateScheduleClock();
-        fitScheduleText();
     }, 1000);
-    window.addEventListener('resize', fitScheduleText);
+    window.addEventListener('resize', scheduleFit);
     if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(fitScheduleText);
+        document.fonts.ready.then(scheduleFit);
     }
+
+    function escapeHTML(value) {
+        return String(value ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[ch]));
+    }
+
+    function trainLabelHTML(index, isLoop) {
+        if (isLoop) {
+            const zh = index === 0 ? '本次列车:' : (index === 1 ? '下次列车:' : `第${index + 1}列车:`);
+            const en = index === 0 ? 'This train' : (index === 1 ? 'Next train' : `Train ${index + 1}`);
+            return `${zh}<span class="train-label-en">${en}</span>`;
+        }
+        const zh = index === 0 ? '本次列车终点站:' : (index === 1 ? '下次列车终点站:' : `第${index + 1}列车终点站:`);
+        const en = index === 0 ? 'Terminal station of this train' : (index === 1 ? 'Terminal station of next train' : `Terminal station of train ${index + 1}`);
+        return `${zh}<span class="train-label-en">${en}</span>`;
+    }
+
+    function loopNameEN(ringLabel) {
+        if (ringLabel === '内环') return 'Inner Loop';
+        if (ringLabel === '外环') return 'Outer Loop';
+        return 'Loop Service';
+    }
+
+    function entryHTML(entry, index) {
+        const isLoop = !!entry.is_loop;
+        let body = '';
+        if (isLoop) {
+            body += `<div class="terminal-cn fit-terminal-cn">${escapeHTML(entry.ring_label || '环线')}</div>`;
+            body += `<div class="terminal-en fit-terminal-en">${escapeHTML(loopNameEN(entry.ring_label))}</div>`;
+            if (entry.has_terminal) {
+                body += `<div class="terminal-extra-cn fit-terminal-cn">终点站: ${escapeHTML(entry.terminal_station)}</div>`;
+                body += `<div class="terminal-extra-en fit-terminal-en">Terminal: ${escapeHTML(entry.terminal_station_en)}</div>`;
+            }
+            body += `<div class="terminal-extra-cn fit-terminal-cn">下一站: ${escapeHTML(entry.next_station || '暂无数据')}</div>`;
+            body += `<div class="terminal-extra-en fit-terminal-en">Next station: ${escapeHTML(entry.next_station_en || 'No data')}</div>`;
+        } else {
+            const badge = entry.express_label ? `<span class="express-badge"><span class="express-badge-cn">直达</span><span class="express-badge-en">Express</span></span>` : '';
+            if (badge) {
+                body += `<div class="terminal-cn-row"><div class="terminal-cn fit-terminal-cn">${escapeHTML(entry.terminal_station || '暂无数据')}</div>${badge}</div>`;
+            } else {
+                body += `<div class="terminal-cn fit-terminal-cn">${escapeHTML(entry.terminal_station || '暂无数据')}</div>`;
+            }
+            body += `<div class="terminal-en fit-terminal-en">${escapeHTML(entry.terminal_station_en || 'No data')}</div>`;
+        }
+
+        return `
+            <section class="train-card">
+                <div class="train-label fit-label">${trainLabelHTML(index, isLoop)}</div>
+                <div class="terminal-area ${isLoop ? 'terminal-loop' : ''}">
+                    <div class="terminal-fit">${body}</div>
+                </div>
+            </section>
+        `;
+    }
+
+    window.applyScheduleData = function(data) {
+        const main = document.querySelector('.schedule-main');
+        if (!main || !data || !Array.isArray(data.entries)) {
+            window.location.reload();
+            return;
+        }
+
+        // 先在屏幕外完成新内容布局和字号适配；旧内容保持不动，避免切换闪烁/跳动。
+        const rect = main.getBoundingClientRect();
+        const staging = main.cloneNode(false);
+        staging.innerHTML = data.entries.map((entry, index) => entryHTML(entry, index)).join('');
+        staging.style.position = 'fixed';
+        staging.style.left = '-10000px';
+        staging.style.top = '0';
+        staging.style.width = `${rect.width}px`;
+        staging.style.height = `${rect.height}px`;
+        staging.style.visibility = 'hidden';
+        staging.style.pointerEvents = 'none';
+        staging.style.gridTemplateRows = `repeat(${Math.max(1, data.entries.length)}, minmax(0, 1fr))`;
+        document.body.appendChild(staging);
+
+        requestAnimationFrame(() => {
+            fitScheduleText(staging);
+            if (data.line_color) {
+                document.documentElement.style.setProperty('--board-line-color', data.line_color);
+            }
+            if (data.header_text_color) {
+                document.documentElement.style.setProperty('--board-line-text-color', data.header_text_color);
+            }
+            const linePill = document.querySelector('.line-pill');
+            if (linePill && data.line_display_name) {
+                linePill.textContent = data.line_display_name;
+            }
+            main.style.gridTemplateRows = staging.style.gridTemplateRows;
+            main.innerHTML = staging.innerHTML;
+            staging.remove();
+            scheduleFit();
+        });
+    };
+
+    window.switchScheduleLine = function(direction) {
+        const endpoint = direction === 'prev' ? '/api/state/line/prev' : '/api/state/line/next';
+        fetch(endpoint, { method: 'POST' })
+            .then(response => response.json())
+            .then(() => fetch('/api/schedule/data'))
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    window.applyScheduleData(data);
+                } else {
+                    console.error('切换线路失败:', data.message);
+                }
+            })
+            .catch(err => console.error('切换线路失败:', err));
+    };
+
+    window.switchScheduleStation = function(direction) {
+        const endpoint = direction === 'prev' ? '/api/state/prev' : '/api/state/next';
+        fetch(endpoint, { method: 'POST' })
+            .then(response => response.json())
+            .then(() => fetch('/api/schedule/data'))
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    window.applyScheduleData(data);
+                } else {
+                    console.error('切换站点失败:', data.message);
+                }
+            })
+            .catch(err => console.error('切换站点失败:', err));
+    };
+
+    window.refreshSchedulePage = function() {
+        fetch('/api/schedule/data')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    window.applyScheduleData(data);
+                }
+            })
+            .catch(err => console.error('刷新班次页失败:', err));
+    };
 </script>
 {% endblock %}
