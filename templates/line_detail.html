@@ -576,6 +576,8 @@
 <script>
 const gStationData = JSON.parse(document.getElementById('station-data')?.textContent || '{}');
 const gColorData = JSON.parse(document.getElementById('color-data')?.textContent || '{}');
+const gLineRaw = '{{ line_name.replace('line_', '') }}';
+const gCurrentLineCode = /^\d+$/.test(gLineRaw) ? gLineRaw.padStart(2, '0') : gLineRaw;
 
 function setTransferBadgeColors() {
     document.querySelectorAll('.transfer-badge[data-color]').forEach(el => {
@@ -589,9 +591,18 @@ function createStationNode(station, isNext = false, isPassed = false) {
     
     // 获取站点编号数据
     const codesRaw = gStationData[station.station_name] || [];
-    
+
+    // 将当前线路编号排在最前面
+    const sortedCodes = [...codesRaw].sort((a, b) => {
+        const aCode = (a[0] || '').toString();
+        const bCode = (b[0] || '').toString();
+        if (aCode === gCurrentLineCode) return -1;
+        if (bCode === gCurrentLineCode) return 1;
+        return 0;
+    });
+
     // 格式化编号：药丸内数字直接用竖线隔开，颜色与左边数字对应线的颜色一致
-    const pills = codesRaw.map(c => {
+    const pills = sortedCodes.map(c => {
         const lineCode = c[0] || '';
         const stationNum = c[1] || '';
         const text = `${lineCode}|${stationNum}`;

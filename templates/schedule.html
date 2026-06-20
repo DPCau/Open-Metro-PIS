@@ -408,15 +408,19 @@
                         <div class="terminal-extra-cn fit-terminal-cn">下一站: {{ entry.next_station or '暂无数据' }}</div>
                         <div class="terminal-extra-en fit-terminal-en">Next station: {{ entry.next_station_en or 'No data' }}</div>
                     {% else %}
-                        {% if entry.express_label %}
+                        {% if entry.is_terminal_station %}
+                            <div class="terminal-cn fit-terminal-cn">退出服务</div>
+                            <div class="terminal-en fit-terminal-en">Exiting Service</div>
+                        {% elif entry.express_label %}
                             <div class="terminal-cn-row">
                                 <div class="terminal-cn fit-terminal-cn">{{ entry.terminal_station or '暂无数据' }}</div>
                                 <span class="express-badge"><span class="express-badge-cn">直达</span><span class="express-badge-en">Express</span></span>
                             </div>
+                            <div class="terminal-en fit-terminal-en">{{ entry.terminal_station_en or 'No data' }}</div>
                         {% else %}
                             <div class="terminal-cn fit-terminal-cn">{{ entry.terminal_station or '暂无数据' }}</div>
+                            <div class="terminal-en fit-terminal-en">{{ entry.terminal_station_en or 'No data' }}</div>
                         {% endif %}
-                        <div class="terminal-en fit-terminal-en">{{ entry.terminal_station_en or 'No data' }}</div>
                     {% endif %}
                     </div>
                 </div>
@@ -676,13 +680,18 @@
             body += `<div class="terminal-extra-cn fit-terminal-cn">下一站: ${escapeHTML(entry.next_station || '暂无数据')}</div>`;
             body += `<div class="terminal-extra-en fit-terminal-en">Next station: ${escapeHTML(entry.next_station_en || 'No data')}</div>`;
         } else {
-            const badge = entry.express_label ? `<span class="express-badge"><span class="express-badge-cn">直达</span><span class="express-badge-en">Express</span></span>` : '';
-            if (badge) {
-                body += `<div class="terminal-cn-row"><div class="terminal-cn fit-terminal-cn">${escapeHTML(entry.terminal_station || '暂无数据')}</div>${badge}</div>`;
+            if (entry.is_terminal_station) {
+                body += `<div class="terminal-cn fit-terminal-cn">退出服务</div>`;
+                body += `<div class="terminal-en fit-terminal-en">Exiting Service</div>`;
             } else {
-                body += `<div class="terminal-cn fit-terminal-cn">${escapeHTML(entry.terminal_station || '暂无数据')}</div>`;
+                const badge = entry.express_label ? `<span class="express-badge"><span class="express-badge-cn">直达</span><span class="express-badge-en">Express</span></span>` : '';
+                if (badge) {
+                    body += `<div class="terminal-cn-row"><div class="terminal-cn fit-terminal-cn">${escapeHTML(entry.terminal_station || '暂无数据')}</div>${badge}</div>`;
+                } else {
+                    body += `<div class="terminal-cn fit-terminal-cn">${escapeHTML(entry.terminal_station || '暂无数据')}</div>`;
+                }
+                body += `<div class="terminal-en fit-terminal-en">${escapeHTML(entry.terminal_station_en || 'No data')}</div>`;
             }
-            body += `<div class="terminal-en fit-terminal-en">${escapeHTML(entry.terminal_station_en || 'No data')}</div>`;
         }
 
         return `

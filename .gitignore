@@ -9,3 +9,4 @@ config/config.json
 fake_*
 .waylog
 private/
+.claude/

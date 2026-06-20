@@ -506,6 +506,7 @@
         <script id="loop-terminal-station-data" type="application/json">{{ loop_terminal_station | tojson }}</script>
         <script id="direction-data" type="application/json">{{ direction | tojson }}</script>
     <script id="layout-mode-data" type="application/json">{{ layout_mode | tojson }}</script>
+    <script id="auto-line-sine-en" type="application/json">{{ (global_config.advance_settings.auto_line_for_sine_mode_en if global_config.advance_settings and global_config.advance_settings.auto_line_for_sine_mode_en is defined else false) | tojson }}</script>
     <script id="services-data" type="application/json">{{ services | tojson }}</script>
         <script id="trans-data" type="application/json">{{ trans_data | tojson }}</script>
     </div>
@@ -812,7 +813,204 @@ function createZigzagLayout() {
         }
         return;
     }
-    
+
+    // --- sine 波模式：正弦曲线布局（仅非环线） ---
+    if (layoutMode === 'sine') {
+        const containerRect = container.getBoundingClientRect();
+        const cWidth = Math.floor(containerRect.width || container.clientWidth || container.offsetWidth || 0);
+        const svgW = Math.max(680, cWidth - 40);
+        const svgH = 460;
+        const marginX = 60;
+        const ns = 'http://www.w3.org/2000/svg';
+        const circleSize = 28;   // 站点圆直径（缩小）
+        const borderWidth = 3;   // 站点圆边框宽度
+        const innerDot = 9;      // 下一站红点直径
+        const autoWrapEn = JSON.parse(document.getElementById('auto-line-sine-en')?.textContent || 'false');
+
+        metroLine.style.cssText = `position:relative;width:${svgW}px;height:${svgH}px;margin:0.1 auto;overflow:visible;`;
+
+        const svg = document.createElementNS(ns, 'svg');
+        svg.setAttribute('width', String(svgW));
+        svg.setAttribute('height', String(svgH));
+        svg.style.cssText = 'display:block;position:absolute;left:0;top:0;z-index:0;';
+
+        const n = lineInfo.length;
+        if (n === 0) { metroLine.innerHTML = '<div style="text-align:center;padding:40px;">暂无站点</div>'; return; }
+
+        // 正弦参数：一个完整周期，整体上移
+        const freq = 2 * Math.PI / Math.max(n - 1, 1);
+        const midY = svgH / 2;      // 中线居中
+        const amp = 150;             // 振幅缩小
+
+        // 生成正弦路径点
+        const pts = [];
+        for (let i = 0; i < n; i++) {
+            const x = marginX + (svgW - marginX * 2) * i / Math.max(n - 1, 1);
+            const y = midY - amp * Math.sin(freq * i);
+            pts.push({ x, y });
+        }
+
+        // 灰色底轨
+        let d = `M ${pts[0].x} ${pts[0].y}`;
+        for (let i = 1; i < n; i++) d += ` L ${pts[i].x} ${pts[i].y}`;
+        const pathBg = document.createElementNS(ns, 'path');
+        pathBg.setAttribute('d', d);
+        pathBg.setAttribute('fill', 'none');
+        pathBg.setAttribute('stroke', '#ddd');
+        pathBg.setAttribute('stroke-width', '15');
+        pathBg.setAttribute('stroke-linecap', 'round');
+        pathBg.setAttribute('stroke-linejoin', 'round');
+        svg.appendChild(pathBg);
+
+        // 主题色彩色段：从 nextStation 开始，跳过不在当前交路的区间
+        const themeColor = getComputedStyle(metroLine).getPropertyValue('--theme-color').trim() || '#9b5de5';
+        const hasRouteFilter = currentRouteStations.length > 0;
+        if (globalNextIndex >= 0 && globalNextIndex < n - 1) {
+            let segStart = -1;
+            for (let i = globalNextIndex; i <= n; i++) {
+                const atEnd = (i === n);
+                const onRoute = !atEnd && (!hasRouteFilter || currentRouteSet.has(lineInfo[i].station_name));
+                if (onRoute && segStart < 0) {
+                    segStart = i;
+                } else if (!onRoute && segStart >= 0) {
+                    // 画一段彩色线：segStart → i-1
+                    let dSeg = `M ${pts[segStart].x} ${pts[segStart].y}`;
+                    for (let j = segStart + 1; j < i; j++) dSeg += ` L ${pts[j].x} ${pts[j].y}`;
+                    const pathSeg = document.createElementNS(ns, 'path');
+                    pathSeg.setAttribute('d', dSeg);
+                    pathSeg.setAttribute('fill', 'none');
+                    pathSeg.setAttribute('stroke', themeColor);
+                    pathSeg.setAttribute('stroke-width', '15');
+                    pathSeg.setAttribute('stroke-linecap', 'round');
+                    pathSeg.setAttribute('stroke-linejoin', 'round');
+                    svg.appendChild(pathSeg);
+                    segStart = -1;
+                }
+            }
+        }
+
+        metroLine.appendChild(svg);
+
+        // 站点圆和标签
+        const group = document.createElement('div');
+        group.style.cssText = `position:absolute;left:0;top:0;width:${svgW}px;height:${svgH}px;z-index:1;`;
+
+        for (let i = 0; i < n; i++) {
+            const s = lineInfo[i];
+            const px = pts[i].x;
+            const py = pts[i].y;
+            const isNext = (i === globalNextIndex);
+            const isPassed = (i < globalNextIndex);
+            const isInactive = currentRouteStations.length > 0 && !currentRouteSet.has(s.station_name);
+            const isDimmed = isPassed || isInactive;
+            const hasBadges = (s.transfer_badges || []).length > 0;
+            const borderColor = isDimmed ? '#cfcfcf' : (isNext ? '#ff3b30' : themeColor);
+
+            // 站点圆
+            const circle = document.createElement('div');
+            const isTransferStyle = hasBadges && !isDimmed;
+            circle.style.cssText = `
+                position:absolute; left:${px}px; top:${py}px;
+                width:${circleSize}px; height:${circleSize}px;
+                border-radius:50%; transform:translate(-50%,-50%); z-index:3;
+                border:${borderWidth}px solid ${borderColor};
+                background:${isTransferStyle ? 'transparent' : (isDimmed ? '#cfcfcf' : '#fff')};
+                display:flex; align-items:center; justify-content:center; position:absolute;
+            `;
+
+            if (hasBadges && !isDimmed) {
+                // 换乘站白点内圆（替代 ::before 伪元素）
+                const whiteDot = document.createElement('span');
+                const inset = Math.round(circleSize * 0.22);
+                whiteDot.style.cssText = `position:absolute;inset:${inset}px;border-radius:50%;background:#fff;z-index:1;`;
+                circle.appendChild(whiteDot);
+
+                // 多色旋转环
+                const badges = s.transfer_badges || [];
+                const colors = [themeColor];
+                for (const b of badges) { if (b.color) colors.push(b.color); }
+                if (colors.length > 1) {
+                    const share = 100 / colors.length;
+                    let start = 0;
+                    const parts = colors.map(c => { const end = start + share; const seg = `${c} ${start}% ${end}%`; start = end; return seg; });
+                    const ring = document.createElement('span');
+                    ring.style.cssText = `position:absolute;inset:-3px;border-radius:50%;background:conic-gradient(${parts.join(',')});z-index:0;animation:spin 4s linear infinite;`;
+                    circle.appendChild(ring);
+                }
+            }
+
+            // 下一站红点
+            if (isNext) {
+                const blink = document.createElement('span');
+                blink.style.cssText = `display:block;width:${innerDot}px;height:${innerDot}px;background:#ff3b30;border-radius:50%;animation:blink 1s infinite alternate;z-index:2;`;
+                circle.appendChild(blink);
+            }
+            group.appendChild(circle);
+
+            // 中文站名（竖直向上，往上移动）
+            const zh = document.createElement('div');
+            zh.textContent = s.station_name;
+            zh.style.cssText = `
+                position:absolute; left:${px}px; bottom:${svgH - py + 20}px;
+                transform:translateX(-50%); writing-mode:vertical-rl; text-orientation:upright;
+                font-size:13px; font-weight:bold; white-space:nowrap;
+                color:${isDimmed ? '#999' : '#333'}; z-index:4; pointer-events:none;
+            `;
+            group.appendChild(zh);
+
+            // 英文名：底部朝左，下方角与中文下方角对齐
+            // 变换链：translateX(-100%) rotate(90deg)，origin=right bottom
+            //   旋转后：原宽度→向上延伸，原高度→向右延伸
+            const en = document.createElement('div');
+            en.textContent = (s.station_en_name || s.station_name_en || '').replace(/<br\s*\/?>/gi, ' ');
+            const availH = py + 80;
+            const enTextLen = (s.station_en_name || s.station_name_en || '').replace(/<br\s*\/?>/gi, ' ').length * 6;
+            const needWrap = autoWrapEn && availH > 0 && enTextLen > availH * 1.5;
+            // wrapLines 仅用于计算偏移，且只有真正换行（needWrap）时才 >1
+            // 用 needWrap 本身判断：需要换行时预留2行空间，否则1行
+            const enLeft = needWrap ? px - 26 : px - 14;
+            const enWrapStyle = needWrap
+                ? `white-space:normal; word-break:break-word; max-width:${availH}px;`
+                : 'white-space:nowrap;';
+            en.style.cssText = `
+                position:absolute; left:${enLeft}px; bottom:${svgH - py + 20}px;
+                ${enWrapStyle}
+                transform-origin:right bottom;
+                transform:translateX(-100%) rotate(90deg);
+                font-size:10px; line-height:1.15;
+                color:${isDimmed ? '#aaa' : '#666'}; z-index:4; pointer-events:none;
+            `;
+            group.appendChild(en);
+
+            // 换乘标识（下方，紧贴站点圆）
+            if (hasBadges) {
+                const badges = s.transfer_badges || [];
+                const badgeRow = document.createElement('div');
+                badgeRow.style.cssText = `
+                    position:absolute; left:${px}px; top:${py + circleSize / 2 + 4}px;
+                    transform:translateX(-50%); display:flex; gap:2px; z-index:4; pointer-events:none;
+                `;
+                for (const b of badges) {
+                    const pill = document.createElement('span');
+                    pill.textContent = b.code;
+                    const isWide = String(b.code).length > 1;
+                    pill.style.cssText = `
+                        display:inline-flex; align-items:center; justify-content:center;
+                        width:${isWide ? 'auto' : '18px'}; min-width:18px; height:18px;
+                        border-radius:${isWide ? '9px' : '50%'};
+                        ${isWide ? 'padding:0 4px;' : ''}
+                        background:${b.color || '#999'}; color:#fff; font-size:10px; font-weight:bold;
+                    `;
+                    badgeRow.appendChild(pill);
+                }
+                group.appendChild(badgeRow);
+            }
+        }
+
+        metroLine.appendChild(group);
+        return;
+    }
+
     // 创建多行Z字形布局
     let currentIndex = 0;
     let rowIndex = 0;
@@ -1885,6 +2083,9 @@ function init() {
         // scrollToNextStation();
         window.addEventListener('resize', handleResize);
     } else {
+        // 恢复容器溢出裁剪（非环线模式）
+        const ringContainer = document.querySelector('.line-map-container');
+        if (ringContainer) ringContainer.style.overflow = 'hidden';
         createZigzagLayout();
         applyCustomLayoutStyles();
         computeRailAndConnectors();
@@ -1919,6 +2120,9 @@ function renderLoopMap() {
     if (!rl || !ml) return;
     rl.style.display = '';
     ml.style.display = 'none';
+    // 放通容器溢出，确保环线站名标签不被裁切
+    const ringContainer = document.querySelector('.line-map-container');
+    if (ringContainer) ringContainer.style.overflow = 'visible';
     rl.innerHTML = '';
 
     const layoutMode = JSON.parse(document.getElementById('layout-mode-data')?.textContent || '"auto"');
@@ -1928,7 +2132,7 @@ function renderLoopMap() {
         const minWidth = 680;
         const containerRectWidth = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
         const width = Math.max(minWidth, containerRectWidth - 40); // 将 reserve 从 160 减小到 40，增加可用宽度
-        const height = Math.max(320, Math.min(520, Math.round(width * 0.45)));
+        const height = Math.max(280, Math.min(440, Math.round(width * 0.38)));
         const margin = 40 * mapScale;
         const W = width - margin * 2;
         const H = height - margin * 2;
@@ -1967,7 +2171,7 @@ function renderLoopMap() {
         const xC = (xL + xR) / 2;
 
         const vLen = Math.round(Math.max(120, Math.min(200, H * 0.35)));
-        const padY = Math.round((H - vLen) / 2) - 150; 
+        const padY = Math.round((H - vLen) / 2) - 100;
         const yT = margin + padY;
         const yB = yT + vLen;
         const r = Math.round(vLen / 2);
@@ -2284,11 +2488,12 @@ function renderLoopMap() {
     // 使用更稳定的尺寸测量，避免初次渲染因容器状态或滚动条导致偏差
     const containerRectWidth = Math.floor(container.getBoundingClientRect().width || container.clientWidth || container.offsetWidth || 0);
     const width = Math.max(minWidth, containerRectWidth - reserve);
-    const height = Math.max(320, Math.min(520, Math.round(width * 0.45)));
+    const height = Math.max(280, Math.min(420, Math.round(width * 0.38)));
     const margin = 40 * mapScale;
     const W = width - margin * 2;
     const H = height - margin * 2;
-    const radius = Math.round(Math.min(W, H) * 0.12);
+    const radius = Math.round(Math.min(W, H) * 0.08);
+    rl.style.overflow = 'visible';
     const ns = 'http://www.w3.org/2000/svg';
 
      const svg = document.createElementNS(ns, 'svg');

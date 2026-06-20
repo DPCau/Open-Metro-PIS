@@ -72,7 +72,11 @@
   "line_9": {
     "display_count": 2,
     "route_order": [
-      1
+      1,
+      1,
+      1,
+      1,
+      2
     ]
   },
   "line_10": {

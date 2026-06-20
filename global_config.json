@@ -10,6 +10,7 @@
         "windows_size": "1470x720",
         "windows_fps": -1,
         "expose_to_network": true,
-        "network_port": 8089
+        "network_port": 8089,
+        "auto_line_for_sine_mode_en": true 
     }
 }

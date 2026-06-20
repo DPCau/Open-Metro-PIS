@@ -480,7 +480,7 @@ def update_layout():
     """更新当前线路的布局模式 (i, o, p 键)"""
     global current_state
     mode = request.json.get('mode') # 'one_line', 'two_line', 'auto'
-    if mode not in ['one_line', 'two_line', 'auto']:
+    if mode not in ['one_line', 'two_line', 'auto', 'sine']:
         return jsonify({'status': 'error', 'message': '无效的布局模式'}), 400
         
     line_name = current_state['line_name']
@@ -496,9 +496,21 @@ def update_layout():
             is_loop = route_data[line_name].get('type') == 'loop'
             if is_loop and mode == 'one_line':
                 mode = 'two_line'
-                
-            route_data[line_name]['layout'] = mode
-            
+
+            # 检查当前交路服务是否有配置覆盖，若有则保存到当前交路的 config 字典中，否则保存到线路
+            services = route_data[line_name].get('services', [])
+            current_route = current_state.get('route_name')
+            saved_to_service = False
+            for svc in services:
+                if _get_service_route_name(svc) == current_route:
+                    if 'config' in svc and isinstance(svc['config'], dict):
+                        svc['config']['layout'] = mode
+                        saved_to_service = True
+                        break
+
+            if not saved_to_service:
+                route_data[line_name]['layout'] = mode
+
             save_json_file(route_file, route_data)
                 
             # 立即失效缓存，确保页面刷新后读取到最新数据
@@ -812,8 +824,14 @@ def _build_schedule_entries(line_name, schedule_index=0):
         next_station_en = re.sub(r'<\s*br\s*/?\s*>', ' ', next_station_en, flags=re.IGNORECASE)
         next_station_en = re.sub(r'\s+', ' ', next_station_en).strip()
     entries = []
-    for offset in range(display_count):
-        route_name = sequence[(schedule_index + offset) % len(sequence)]
+    search_count = 0
+    max_search = len(sequence) * 2
+    idx = schedule_index
+    while len(entries) < display_count and search_count < max_search:
+        route_name = sequence[idx % len(sequence)]
+        idx = (idx + 1) % len(sequence)
+        search_count += 1
+
         service = None
         for item in services:
             if _get_service_route_name(item) == route_name:
@@ -823,6 +841,19 @@ def _build_schedule_entries(line_name, schedule_index=0):
         express_label = service_label if service_label == '直达 Express' else ''
         terminal_station = _get_service_terminal_station(line_name, route_name, direction)
         has_terminal = bool((terminal_station or '').strip())
+
+        # 检查当前站是否在该交路的站列表中（非环线）
+        serving_station = True
+        is_terminal_station = False
+        if not is_loop:
+            route_stations = (service or {}).get('stations', [])
+            if isinstance(route_stations, list) and route_stations:
+                serving_station = next_station in route_stations
+                if serving_station and terminal_station:
+                    is_terminal_station = next_station == terminal_station
+            if not serving_station:
+                continue
+
         terminal_station_en = trans_data.get(terminal_station, terminal_station) if isinstance(trans_data, dict) else terminal_station
         if isinstance(terminal_station_en, str):
             terminal_station_en = re.sub(r'<\s*br\s*/?\s*>', ' ', terminal_station_en, flags=re.IGNORECASE)
@@ -833,6 +864,8 @@ def _build_schedule_entries(line_name, schedule_index=0):
             'terminal_station_en': terminal_station_en,
             'is_loop': is_loop,
             'has_terminal': has_terminal,
+            'serving_station': serving_station,
+            'is_terminal_station': is_terminal_station,
             'label': service_label,
             'express_label': express_label,
             'ring_label': _ring_label_for_route(route_name, direction) if is_loop else '',
@@ -840,7 +873,38 @@ def _build_schedule_entries(line_name, schedule_index=0):
             'next_station_en': next_station_en if is_loop else ''
         })
 
+    # 如果所有交路都被过滤掉（当前站不途经任何交路），回退显示默认班次
+    if not entries and not is_loop and sequence:
+        for offset in range(display_count):
+            route_name = sequence[(schedule_index + offset) % len(sequence)]
+            service = None
+            for item in services:
+                if _get_service_route_name(item) == route_name:
+                    service = item
+                    break
+            terminal_station = _get_service_terminal_station(line_name, route_name, direction)
+            has_terminal = bool((terminal_station or '').strip())
+            terminal_station_en = trans_data.get(terminal_station, terminal_station) if isinstance(trans_data, dict) else terminal_station
+            if isinstance(terminal_station_en, str):
+                terminal_station_en = re.sub(r'<\s*br\s*/?\s*>', ' ', terminal_station_en, flags=re.IGNORECASE)
+                terminal_station_en = re.sub(r'\s+', ' ', terminal_station_en).strip()
+            entries.append({
+                'route_name': route_name,
+                'terminal_station': terminal_station,
+                'terminal_station_en': terminal_station_en,
+                'is_loop': is_loop,
+                'has_terminal': has_terminal,
+                'serving_station': False,
+                'is_terminal_station': False,
+                'label': service.get('label', '') if service else '',
+                'express_label': '直达 Express' if (service or {}).get('label') == '直达 Express' else '',
+                'ring_label': _ring_label_for_route(route_name, direction) if is_loop else '',
+                'next_station': next_station if is_loop else '',
+                'next_station_en': next_station_en if is_loop else ''
+            })
+
     return entries, schedule_index, display_count
+
 
 def _advance_schedule(delta):
     global current_state
@@ -1561,6 +1625,16 @@ def line_map():
             route_data = _get_route_data()
             d = route_data.get(line_name, {})
             layout_mode = (d.get('layout') or 'auto')
+
+            # 交路服务级别配置覆盖
+            services = d.get('services', [])
+            current_route = current_state.get('route_name')
+            for svc in services:
+                if _get_service_route_name(svc) == current_route:
+                    cfg = svc.get('config')
+                    if isinstance(cfg, dict) and 'layout' in cfg:
+                        layout_mode = cfg['layout']
+                        break
         except Exception:
             layout_mode = 'auto'
 

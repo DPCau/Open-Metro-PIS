@@ -42,6 +42,7 @@ Mirror address in China Mainland (synchronized every 8 hours): [Gitea Mirror](ht
 
 ## Update Notes
 
+- 2026-06-16 Added sine wave layout mode for non-loop lines (P key), moved auto mode to `[` key, added touch button hide shortcut (M key persists across pages), line map bend transitions changed to SVG arc curves.
 - 2026-02-07 Fixed several display issues, added the ability to disable routing, and updated the network lines.
 - 2026-01-09 Fixed some line information, added advanced settings, and added configuration options for FPS and window size.
 - 2026-01-02 Added `detail` mode for route preview (for loop lines, express lines, etc.), and added some depot return routes.
@@ -319,8 +320,9 @@ Visit http://localhost:8089 in your browser.
 - Use `F` key to switch to the next station without refreshing the current page (so the next page switch shows the updated station).
 - Use `R` key to toggle direction.
 - Use `T` key to toggle door opening side.
+- Use `M` key to toggle mobile control buttons show/hide.
 - On the Line Preview page (key `1`), use `I`, `O` to switch between Default and Detailed modes.
-- On the Line Map page (key `2`), use `I`, `O`, `P` to switch between Single-line, Two-line, and Auto modes (on loop lines, `I` also switches to Two-line).
+- On the Line Map page (key `2`), use `I`, `O`, `[` to switch between Single-line, Two-line, and Auto modes (on loop lines, `I` also switches to Two-line). `P` key switches to Sine wave mode (non-loop lines only).
 - On the Station Detail page (key `3`), use `I`, `O` to switch between Default and Column modes.
 - Use `K` and `L` keys to switch between operating lines.
 
@@ -370,7 +372,7 @@ Field Descriptions:
 - line_name: Name of the line.
 - run_style: Display style for the operating route; `default` for standard mode, `detail` for detailed mode.
 - type: Line type; `linear` for normal lines, `loop` for loop lines.
-- layout: Line layout; `auto` for automatic, `two_line` for two-line, `one_line` for single-line. **Loop lines do not support `one_line` layout.**
+- layout: Line layout; `auto` for automatic, `two_line` for two-line, `one_line` for single-line, `sine` for sine wave (non-loop lines only). **Loop lines do not support `one_line` layout.**
 - detail_style: Station detail display style; `default` or `column`.
 - carriage_count: Number of carriages, determines the train display on the arrival page.
 - services

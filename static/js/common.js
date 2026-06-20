@@ -132,6 +132,14 @@ function updateSchedule(direction) {
         .catch(err => console.error('切换班次失败:', err));
 }
 
+// 页面加载时：检查 sessionStorage 保持触控按钮隐藏状态
+document.addEventListener('DOMContentLoaded', function() {
+    if (sessionStorage.getItem('controlsHidden') === 'true') {
+        const controls = document.querySelector('.mobile-controls');
+        if (controls) controls.style.display = 'none';
+    }
+});
+
 // 键盘快捷键监听
 document.addEventListener('keydown', function(event) {
     // 1 -> 首页, 2 -> 线路图, 3 -> 线路详情, 4 -> 到站, 5 -> 班次
@@ -160,6 +168,16 @@ document.addEventListener('keydown', function(event) {
                         window.location.reload();
                     }
                 });
+        } else if (event.key.toLowerCase() === 'm') {
+            // M 键 -> 切换触控按钮显示/隐藏（跨页面保持，关闭标签页自动复位）
+            const controls = document.querySelector('.mobile-controls');
+            if (controls) {
+                const isHidden = controls.style.display === 'none' ||
+                    sessionStorage.getItem('controlsHidden') === 'true';
+                const newHidden = !isHidden;
+                controls.style.display = newHidden ? 'none' : '';
+                sessionStorage.setItem('controlsHidden', newHidden ? 'true' : '');
+            }
         } else if (event.key.toLowerCase() === 'f') {
             // F 键 -> 切换到下一站（不刷新）
             fetch('/api/state/next_no_refresh', { method: 'POST' })
@@ -283,10 +301,15 @@ document.addEventListener('keydown', function(event) {
         } else if (window.location.pathname === '/line_detail') {
             updateDetailStyle('column');
         }
-    } else if (event.key.toLowerCase() === 'p') {
-        // p 键 -> 自动模式 (仅在页面2/线路图生效)
+    } else if (event.key === '[') {
+        // [ 键 -> 自动模式 (仅在页面2/线路图生效)
         if (window.location.pathname === '/line_map') {
             updateLayout('auto');
+        }
+    } else if (event.key.toLowerCase() === 'p') {
+        // p 键 -> 正弦波模式 (仅在页面2/线路图生效，非环线)
+        if (window.location.pathname === '/line_map') {
+            updateLayout('sine');
         }
     }
 });
